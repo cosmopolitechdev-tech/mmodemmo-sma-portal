@@ -374,11 +374,11 @@
       .hero-ctas {
         display: flex;
         gap: 14px;
-        margin-top: 30px;
+        margin-top: 14px;
         flex-wrap: wrap;
         justify-content: center;
         opacity: 0;
-        animation: riseIn 0.7s ease forwards 0.55s;
+        animation: riseIn 0.7s ease forwards 0.62s;
       }
 
       @keyframes riseIn {
@@ -442,27 +442,50 @@
         color: var(--board);
       }
 
-      .btn-download {
-        position: relative;
-      }
-      .btn-download::after {
-        content: "";
-        position: absolute;
-        inset: -4px;
-        border: 1.5px solid var(--stamp);
-        border-radius: 5px;
+      /* Three-edition download group -- one row of small labeled buttons,
+         each linking straight to that build's own GitHub release asset. */
+      .download-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 30px;
+        flex-wrap: wrap;
+        justify-content: center;
         opacity: 0;
-        animation: pulseRing 2.2s ease-out infinite 1.6s;
+        animation: riseIn 0.7s ease forwards 0.55s;
       }
-
-      @keyframes pulseRing {
-        0% {
-          opacity: 0.55;
-          transform: scale(1);
-        }
-        100% {
-          opacity: 0;
-          transform: scale(1.18);
+      .dl-btn {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        min-width: 108px;
+        text-decoration: none;
+        padding: 10px 16px;
+        border-radius: 3px;
+        background: var(--stamp);
+        color: #fff;
+        transition:
+          transform 0.12s ease,
+          background 0.15s ease,
+          color 0.15s ease;
+      }
+      .dl-btn:hover {
+        transform: translateY(-2px) scale(1.02);
+        background: var(--stamp-deep);
+        color: var(--gold);
+      }
+      .dl-btn .dl-edition {
+        font-weight: 700;
+        font-size: 0.92rem;
+      }
+      .dl-btn .dl-sub {
+        font-size: 0.72rem;
+        opacity: 0.85;
+      }
+      @media (max-width: 640px) {
+        .dl-btn {
+          min-width: 96px;
+          padding: 9px 12px;
         }
       }
 
@@ -1012,13 +1035,31 @@
           between the desktop application and the online portal.
         </p>
 
-        <div class="hero-ctas">
+        <div class="download-group">
           <a
-            class="btn btn-primary btn-download"
+            class="dl-btn"
+            href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoPrimarySMASetup_1.0.0.exe"
+            download
+            ><span class="dl-edition">⬇ Primary</span
+            ><span class="dl-sub">Creche &ndash; Basic 6</span></a
+          >
+          <a
+            class="dl-btn"
+            href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoJHSSMASetup_1.0.0.exe"
+            download
+            ><span class="dl-edition">⬇ JHS</span
+            ><span class="dl-sub">Basic 7 &ndash; 9</span></a
+          >
+          <a
+            class="dl-btn"
             href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoSMASetup_1.0.0.exe"
             download
-            >⬇ Download for Windows</a
+            ><span class="dl-edition">⬇ Both</span
+            ><span class="dl-sub">Primary &amp; JHS</span></a
           >
+        </div>
+
+        <div class="hero-ctas">
           <a id="bookDemoBtn" class="btn btn-demo" href="sales.html#contact"
             >Book a demo</a
           >
@@ -1026,6 +1067,8 @@
 
         <div class="hero-note">
           Free installer &middot; Windows 10/11 &middot;
+          <a href="sales.html#pricing">Full features &amp; pricing</a>
+          &middot;
           <a href="privacy.html">Privacy Policy</a>
         </div>
       </div>
@@ -1432,12 +1475,29 @@
             </h2>
           </div>
 
-          <a
-            class="btn btn-primary btn-download"
-            href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoSMASetup_1.0.0.exe"
-            download
-            >⬇ Download for Windows</a
-          >
+          <div class="download-group" style="margin-top: 0; opacity: 1; animation: none">
+            <a
+              class="dl-btn"
+              href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoPrimarySMASetup_1.0.0.exe"
+              download
+              ><span class="dl-edition">⬇ Primary</span
+              ><span class="dl-sub">Creche &ndash; Basic 6</span></a
+            >
+            <a
+              class="dl-btn"
+              href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoJHSSMASetup_1.0.0.exe"
+              download
+              ><span class="dl-edition">⬇ JHS</span
+              ><span class="dl-sub">Basic 7 &ndash; 9</span></a
+            >
+            <a
+              class="dl-btn"
+              href="https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest/download/MmodemmoSMASetup_1.0.0.exe"
+              download
+              ><span class="dl-edition">⬇ Both</span
+              ><span class="dl-sub">Primary &amp; JHS</span></a
+            >
+          </div>
         </div>
       </div>
 
