@@ -506,6 +506,28 @@
         color: #fff;
       }
 
+      /* Demo mode credentials */
+      .demo-box {
+        margin-top: 18px;
+        padding: 10px 18px;
+        border: 1px dashed rgba(228, 183, 92, 0.6);
+        border-radius: 4px;
+        background: rgba(243, 239, 227, 0.06);
+        color: var(--board-ink);
+        font-size: 0.88rem;
+        text-align: center;
+        opacity: 0;
+        animation: riseIn 0.7s ease forwards 0.6s;
+      }
+      .demo-box code {
+        font-family: "IBM Plex Mono", monospace;
+        font-weight: 600;
+        color: var(--gold);
+        background: rgba(0, 0, 0, 0.25);
+        padding: 2px 7px;
+        border-radius: 3px;
+      }
+
       /* Reveal on scroll */
       .reveal {
         opacity: 0;
@@ -1051,6 +1073,12 @@
           >
         </div>
 
+        <div class="demo-box">
+          <strong>Try Demo Mode:</strong> choose Demo Mode after installing,
+          then sign in with username <code>admin</code> and password
+          <code>admin</code>
+        </div>
+
         <div class="hero-ctas">
           <a id="bookDemoBtn" class="btn btn-demo" href="sales.html#contact"
             >Book a demo</a
@@ -1341,6 +1369,19 @@
         </div>
 
         <div class="faq">
+          <details class="faq-item">
+            <summary>
+              How do I try the app before using my school's real data?
+            </summary>
+            <p>
+              Install the app and open Demo Mode. Sign in with username
+              <b>admin</b> and password <b>admin</b> to explore every feature
+              with sample data. These default credentials are for demo mode
+              only, so set your own secure login when you set up your school's
+              real account.
+            </p>
+          </details>
+
           <details class="faq-item">
             <summary>
               What happens if a school computer is lost or damaged?
