@@ -484,9 +484,25 @@
         opacity: 0.85;
       }
       @media (max-width: 640px) {
+        .download-group {
+          flex-wrap: nowrap;
+          gap: 6px;
+          width: 100%;
+          justify-content: center;
+        }
         .dl-btn {
-          min-width: 96px;
-          padding: 9px 12px;
+          flex: 1 1 0;
+          min-width: 0;
+          max-width: 140px;
+          padding: 9px 6px;
+          text-align: center;
+        }
+        .dl-btn .dl-sub {
+          font-size: 0.66rem;
+        }
+        .wa-card {
+          flex-direction: column;
+          text-align: center;
         }
       }
 
@@ -580,8 +596,8 @@
         border-radius: 4px;
         font-weight: 700;
         text-decoration: none;
-        color: var(--stamp);
-        border-bottom: 2px solid var(--stamp);
+        color: var(--gold);
+        border-bottom: 2px solid var(--gold);
         transition:
           background 0.15s ease,
           color 0.15s ease;
@@ -592,7 +608,7 @@
         border-bottom-color: var(--stamp);
       }
       .info-card p a {
-        color: var(--stamp);
+        color: var(--gold);
         font-weight: 700;
         text-decoration: underline;
       }
@@ -953,6 +969,7 @@
         .cta-card {
           flex-direction: column;
           align-items: flex-start;
+          padding: 28px 16px;
         }
       }
 
@@ -1487,7 +1504,7 @@
         </p>
 
         <div
-          class="info-card"
+          class="info-card wa-card"
           style="display: flex; gap: 24px; align-items: center; flex-wrap: wrap"
         >
           <img
@@ -1517,7 +1534,7 @@
       <div class="section reveal cta-banner">
         <div class="cta-card">
           <div>
-            <div class="eyebrow" style="color: var(--stamp)">
+            <div class="eyebrow" style="color: var(--gold)">
               Ready when you are
             </div>
             <h2 style="font-size: 1.4rem; margin-top: 6px">
