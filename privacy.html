@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy | Mmodemmo School Management System</title>
-  <meta name="description" content="Privacy Policy for Mmodemmo School Management System, including Google OAuth, Google Drive and Google Sheets data access.">
+  <meta name="description" content="Privacy Policy for Mmodemmo School Management System, including Google OAuth and Google Drive data access.">
   <link rel="icon" type="image/png" href="./images/mmodemmo-logo.png" />
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="/privacy.html">
@@ -138,7 +138,7 @@
         accounts:
       </p>
       <ul>
-        <li><strong class="item-label">Admin</strong> — the school administrator who runs the desktop application, sets up and manages teacher accounts and PINs, and may connect a Google account to enable the Google Sheets and Drive workflows described in Section 3.</li>
+        <li><strong class="item-label">Admin</strong> — the school administrator who runs the desktop application, sets up and manages teacher accounts and PINs, and may connect a Google account to enable the Google Drive backups described in Section 3.</li>
         <li><strong class="item-label">Teacher</strong> — a staff member who accesses the online portal using a PIN issued by the school administrator, scoped to their assigned classes and duties, to enter marks, attendance, levy, and related academic data.</li>
       </ul>
       <p>
@@ -152,7 +152,7 @@
       <ul>
         <li><strong class="item-label">School records entered into the application</strong> — student names and class information, attendance records, levy/fee payment records, SBA and exam marks, and related academic data that the school's administrators and teachers enter directly into the desktop application or online portal.</li>
         <li><strong class="item-label">Teacher access information</strong> — the name and contact details a school administrator adds for each teacher, and the PIN used to access the online portal. This is set and controlled by the school administrator, not collected from teachers directly by us.</li>
-        <li><strong class="item-label">Google account information (school administrator only)</strong> — when a school administrator connects their Google account, the application receives only what is needed to identify the connected account and to read and write data in the Google Sheets and Drive files the application itself creates or is given access to. See Section 3 for the specific Google permissions requested.</li>
+        <li><strong class="item-label">Google account information (school administrator only)</strong> — when a school administrator connects their Google account, the application receives only what is needed to create, read and update the backup files the application itself creates in that account's Google Drive. See Section 3 for the specific Google permissions requested.</li>
       </ul>
     </div>
 
@@ -160,18 +160,17 @@
       <div class="section-label"><span class="num">03</span><h2>Google Authentication &amp; Google User Data</h2></div>
       <p>
         The application uses Google OAuth and, according to the configuration supplied for this
-        website, requests these Google API scopes:
+        website, requests this single Google API scope:
       </p>
       <div class="card">
         <ul>
-          <li><strong class="item-label">Google Drive API</strong> — permits the application to access files that it creates or opens with the application, rather than providing unrestricted access to a user's entire Google Drive.</li>
-          <li><strong class="item-label">Google Sheets API</strong> — permits the application to read and write Google Sheets needed for the application's school-data workflow.</li>
+          <li><strong class="item-label">Google Drive API (drive.file)</strong> — permits the application to access only the files it creates itself, rather than providing unrestricted access to a user's entire Google Drive.</li>
         </ul>
       </div>
       <p>
-        Based on the information supplied, these permissions are used to support the school's
-        data workflow, including working with Google Sheets and application-related files in
-        Google Drive. The supplied configuration does <strong>not</strong> identify Gmail,
+        This permission is used only to store, list and restore the school's database backups in a
+        folder the application creates in Google Drive. The desktop application does not request
+        access to Google Sheets. The supplied configuration does <strong>not</strong> identify Gmail,
         Google Calendar, Google Photos, or other Google API scopes.
       </p>
       <p>
@@ -191,7 +190,7 @@
         <li>authenticating and authorizing users (Admin and Teacher accounts alike) where Google authentication is used;</li>
         <li>providing authorized users with the school-management and academic-data functions of the application;</li>
         <li>maintaining school records, assessments, attendance, levies, examinations, and reports;</li>
-        <li>supporting the application's Google Sheets and Google Drive workflows;</li>
+        <li>storing and restoring the school's database backups in Google Drive;</li>
         <li>maintaining application operation and security; and</li>
         <li>responding to support and privacy requests.</li>
       </ul>

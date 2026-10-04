@@ -1332,10 +1332,11 @@
         <div class="info-card">
           <h2>Authentication &amp; Access control</h2>
           <p>
-            The school administrator authenticates with their school's Google
-            account so the desktop application can sync data to that school's
-            own Google Sheet and store a backup copy in that school's own Google
-            Drive. Teacher access to the online portal is separately controlled
+            The school administrator can sign in with their school's Google
+            account so the desktop application can store a backup copy in that
+            school's own Google Drive. Syncing with the school's own Google
+            Sheet goes through the school's own portal and sync code, not this
+            sign-in. Teacher access to the online portal is separately controlled
             through admin-issued PINs, not through Google sign-in.
           </p>
 
@@ -1352,15 +1353,11 @@
           <h2>Google Account Access</h2>
 
           <p>
-            Mmodemmo School Management System requests only the Google
-            permissions needed to sync and back up a school's own records:
+            Mmodemmo School Management System requests one Google permission,
+            only to back up a school's own records:
           </p>
 
           <ul>
-            <li>
-              <b>Google Sheets</b> — to read and write the school's own student,
-              teacher, attendance, and fee records.
-            </li>
             <li>
               <b>Google Drive (app-created files only)</b> — to store an
               encrypted backup of the school's database in a folder the app
@@ -1370,8 +1367,8 @@
           </ul>
 
           <p>
-            Mmodemmo School Management System does not request access to Gmail,
-            Calendar, Contacts, or any other Google service, and does not use
+            Mmodemmo School Management System does not request access to Google
+            Sheets, Gmail, Calendar, Contacts, or any other Google service, and does not use
             Google account data for advertising.
           </p>
         </div>
