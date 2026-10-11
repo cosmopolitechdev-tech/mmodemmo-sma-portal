@@ -6825,7 +6825,7 @@ function forceAdminLogout() {
 // Reads the session, then loads the admin's identity, labels and the first section.
 function startAdminDashboard_() {
   // School name and logo (the emoji stays when none is set).
-  applyPublicBranding(["topbarBrandIcon"], " — Admin Dashboard");
+  applyPublicBranding(["topbarBrandIcon"], " — Admin Dashboard", toDisplayCaseName);
 
   ADMIN_TOKEN = getAdminSession().token;
   if (!ADMIN_TOKEN) {

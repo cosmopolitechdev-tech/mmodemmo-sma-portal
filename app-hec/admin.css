@@ -45,6 +45,10 @@
   .topbar__portal-btn-text {
     display: none;
   }
+  /* The school's name needs the logo's room beside the menu, link and logout buttons */
+  .topbar__brand-icon {
+    display: none;
+  }
   /* ensure modal body padding is preserved on tiny screens */
   .modal__body {
     padding: var(--space-4);

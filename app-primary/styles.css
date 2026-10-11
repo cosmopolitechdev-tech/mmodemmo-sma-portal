@@ -190,15 +190,18 @@ textarea {
   font-size: var(--font-size-lg);
   font-weight: 700;
   letter-spacing: -0.02em;
-  white-space: nowrap;
+  line-height: 1.15;
   /* Allow the brand block to shrink below its natural content width. */
   min-width: 0;
   flex-shrink: 1;
 }
 .topbar__brand > span {
-  /* Truncate with an ellipsis instead of forcing the topbar wider than the viewport. */
+  /* The school's name shows in full, wrapping inside the bar instead of being cut off; only a
+     name longer than the line limit is cut. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
 }
 .topbar__brand-icon {
@@ -2850,6 +2853,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   .topbar__brand {
     font-size: var(--font-size-base);
   }
+  .topbar__brand-icon {
+    width: 28px;
+    height: 28px;
+  }
   .monitoring-panels {
     grid-template-columns: 1fr;
   }
@@ -3075,5 +3082,16 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: #6e1728;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+}
+
+/* Phones: the name gets a smaller size and up to three lines beside the bar's buttons. */
+@media (max-width: 480px) {
+  .topbar__brand {
+    font-size: 0.85rem;
+    gap: var(--space-2);
+  }
+  .topbar__brand > span {
+    -webkit-line-clamp: 3;
   }
 }
