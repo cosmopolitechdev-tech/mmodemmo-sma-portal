@@ -1,0 +1,256 @@
+<!-- Admin dashboard, ported from gas/AdminDashboard.html's <body>. admin.js fills the sections. -->
+<!-- ── Global Spinner ──────────────────────────────────────────────────────── -->
+<div id="spinnerOverlay" class="spinner-overlay">
+  <div class="spinner-box">
+    <div class="spinner"></div>
+    <div class="spinner-overlay__text">Please wait…</div>
+  </div>
+</div>
+
+<!-- ── Toast Container ─────────────────────────────────────────────────────── -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- ── Modal Container ─────────────────────────────────────────────────────── -->
+<div id="globalModal" class="modal-overlay" role="dialog" aria-modal="true"></div>
+
+<!-- ── Sidebar Backdrop (mobile) ──────────────────────────────────────────── -->
+<div class="sidebar-backdrop" id="sidebarBackdrop" data-onclick="closeSidebar()"></div>
+
+<!-- ── Top Bar ─────────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <button
+    class="hamburger"
+    id="hamburgerBtn"
+    data-onclick="toggleSidebar()"
+    aria-label="Toggle menu"
+  >
+    ☰
+  </button>
+  <div class="topbar__brand">
+    <div class="topbar__brand-icon" id="topbarBrandIcon">🏫</div>
+    <span id="systemName">School Management System</span>
+  </div>
+  <div class="topbar__spacer"></div>
+
+  <div class="topbar__right">
+    <!-- Added .topbar__admin-label class so it can be hidden on very small screens -->
+    <span
+      class="topbar__admin-label"
+      id="topbarAdminIdentity"
+      style="font-size: var(--font-size-sm); color: rgba(255, 255, 255, 0.8)"
+      >Administrator</span
+    >
+    <button
+      class="btn btn--topbar btn--sm"
+      data-onclick="copyPortalLink()"
+      title="Copy the portal link to share or bookmark"
+    >
+      🔗 <span class="topbar__portal-btn-text">Copy Portal Link</span>
+    </button>
+    <button class="btn btn--danger btn--sm" data-onclick="doAdminLogout()">Logout</button>
+  </div>
+</header>
+
+<!-- ── App Shell ───────────────────────────────────────────────────────────── -->
+<div class="app-shell" style="margin-top: var(--topbar-height)">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar__nav">
+      <div class="sidebar__section-label">TEACHERS</div>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('allTeachers');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">👥</span> All Teachers
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('addTeacher');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">➕</span> Add Teacher
+      </a>
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">ENROLMENT</div>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('studentEnrollment');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">🎓</span> Student Enrollment
+      </a>
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">DUTY ASSIGNMENT</div>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('classAssignments');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">📋</span>
+        <span id="sidebarClassAssignLabel">Attendance/Levy Assig..</span>
+      </a>
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">RECORDS</div>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('attendanceRecords');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">📅</span> Attendance Records
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('levyRecords');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">💰</span>
+        <span id="sidebarLevyLabel">Daily Levy Records</span>
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('admissionFeeRecords');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">💰</span>
+        <span id="sidebarAdmissionFeeLabel">Admission Fee Records</span>
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('tuitionFeeRecords');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">💰</span>
+        <span id="sidebarTuitionFeeLabel">Tuition Fee Records</span>
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('sbaRecords');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">📝</span> SBA Records
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('behaviorStatus');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">📓</span> Behaviour Status
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('mockExams');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">🎓</span> Mock Exams
+      </a>
+      <div class="sidebar__divider"></div>
+      <!-- <div class="sidebar__section-label">Export Data and Share</div>
+        -->
+      <div class="sidebar__section-label">EXPORT DATA & SHARE</div>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('shareLinks');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">🔗</span> Share Links
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('exportData');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">📤</span> Export Data
+      </a>
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">SYSTEM</div>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('purgeLog');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">🗑</span> Purge Log
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('auditLog');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">📜</span> Audit Log
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('settings');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">⚙</span> Settings
+      </a>
+      <a
+        class="sidebar__link"
+        href="#"
+        data-onclick="
+          showSection('help');
+          return false;
+        "
+      >
+        <span class="sidebar__link-icon">❓</span> Help
+      </a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content" id="mainContent">
+    <div class="page-content" id="pageContent">
+      <!-- Sections rendered here -->
+    </div>
+  </main>
+</div>
+<!-- /app-shell -->
