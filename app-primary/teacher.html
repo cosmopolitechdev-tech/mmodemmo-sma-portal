@@ -1,0 +1,62 @@
+<!-- Teacher dashboard, ported from gas/TeacherDashboard.html's <body>. teacher.js builds the tabs. -->
+<div id="spinnerOverlay" class="spinner-overlay">
+  <div class="spinner-box">
+    <div class="spinner"></div>
+    <div class="spinner-overlay__text">Please wait…</div>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<header class="topbar">
+  <div class="topbar__brand">
+    <div class="topbar__brand-icon" id="topbarBrandIcon">🏫</div>
+    <span id="systemName">School Management System</span>
+  </div>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__right">
+    <div class="topbar__user">
+      <div>
+        <div class="topbar__user-name" id="topbarTeacherName">—</div>
+        <div class="topbar__user-id" id="topbarStaffId">—</div>
+      </div>
+    </div>
+    <button class="btn btn--danger btn--sm" id="btnLogout" type="button">Logout</button>
+  </div>
+</header>
+
+<div class="teacher-main">
+  <div class="profile-info-card" id="profileInfoCard">
+    <div class="profile-info-card__avatar" id="avatarInitials">—</div>
+    <div class="profile-info-card__details">
+      <div class="profile-info-card__name" id="profileFullName">Loading…</div>
+      <div class="profile-info-card__meta" id="profileMeta">—</div>
+      <div class="profile-info-card__badges" id="profileBadges"></div>
+    </div>
+    <div class="profile-info-meta-right">
+      <div>Last Login: <span id="profileLastLogin">—</span></div>
+      <div>Last Submission: <span id="profileLastSub">—</span></div>
+    </div>
+  </div>
+
+  <!-- Academic Year / Term / Week, shown once above the tabs; Week is for today's date. -->
+  <div
+    id="sharedContextRow"
+    style="
+      display: flex;
+      gap: var(--space-5);
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: var(--space-4);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+    "
+  >
+    <span>Academic Year: <strong id="sharedAcademicYear">—</strong></span>
+    <span>Term: <strong id="sharedTerm">—</strong></span>
+    <span>Week: <strong id="sharedWeekNum">—</strong></span>
+  </div>
+
+  <div class="tabs" id="teacherTabs" style="margin-bottom: 0"></div>
+  <div id="tabPanels" class="teacher-tab-panels"></div>
+</div>
