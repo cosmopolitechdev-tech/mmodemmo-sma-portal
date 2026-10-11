@@ -301,12 +301,13 @@ function renderBrandIcon(elementId, base64Data, mimeType) {
 }
 
 /* Shows the configured names at once, then the server's names and logo when they arrive.
-   titleSuffix (optional) follows the system name in the browser tab, e.g. " — Teacher Dashboard". */
-function applyPublicBranding(logoIds, titleSuffix) {
+   titleSuffix (optional) follows the system name in the browser tab, e.g. " — Teacher Dashboard";
+   formatName (optional) changes how the name shows on the page, e.g. toDisplayCaseName. */
+function applyPublicBranding(logoIds, titleSuffix, formatName) {
   var setNames = function (systemName, schoolName) {
     document.title = systemName + (titleSuffix || "");
     var nameEl = document.getElementById("systemName");
-    if (nameEl) nameEl.textContent = systemName;
+    if (nameEl) nameEl.textContent = formatName ? formatName(systemName) : systemName;
     var schoolEl = document.getElementById("schoolName");
     if (schoolEl) schoolEl.textContent = schoolName || "";
   };
@@ -343,4 +344,25 @@ function applyPublicBranding(logoIds, titleSuffix) {
       console.warn("getPublicConfig failed", err);
     },
   );
+}
+
+// "KOKOBEN D/A JUNIOR HIGH SCHOOL" -> "Kokoben D/A Junior High School" for display: each word
+// capitalised, short capital abbreviations (JHS, SDA, R/C, not "ST.") kept, joining words in
+// lower case.
+function toDisplayCaseName(text) {
+  var joining = { of: 1, and: 1, the: 1, for: 1, in: 1, at: 1, on: 1, de: 1 };
+  return String(text || "")
+    .trim()
+    .split(/\s+/)
+    .map(function (word, i) {
+      var lower = word.toLowerCase();
+      if (i > 0 && joining[lower]) return lower;
+      var letters = word.replace(/[^A-Za-z]/g, "");
+      if (letters && letters.length <= 3 && letters === letters.toUpperCase() && !/\.$/.test(word))
+        return word;
+      return lower.replace(/(^|[\/\-(]|'(?=[a-z]{2}))([a-z])/g, function (m, before, first) {
+        return before + first.toUpperCase();
+      });
+    })
+    .join(" ");
 }

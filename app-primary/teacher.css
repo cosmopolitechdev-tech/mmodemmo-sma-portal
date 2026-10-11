@@ -120,3 +120,14 @@
     padding: var(--space-3);
   }
 }
+
+/* The school's name shows in full in the top bar (the teacher's name is in the profile card):
+   it may wrap onto two lines instead of being cut off. */
+.topbar__brand {
+  white-space: normal;
+  line-height: 1.15;
+}
+.topbar__brand > span {
+  overflow: visible;
+  text-overflow: clip;
+}

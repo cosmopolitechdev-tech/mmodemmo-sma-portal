@@ -516,3 +516,48 @@ body {
     padding-top: calc(var(--space-6) * 3);
   }
 }
+
+/* Frosted glass: soft brand-coloured light behind a translucent header and card. Browsers
+   without backdrop blur keep the solid look, and so does anyone whose device asks for
+   reduced transparency. */
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  body {
+    background:
+      radial-gradient(circle at 12% 18%, rgba(142, 30, 53, 0.3), transparent 42%),
+      radial-gradient(circle at 88% 82%, rgba(201, 162, 39, 0.28), transparent 45%),
+      var(--bg-page);
+    background-attachment: fixed;
+  }
+  .login-header {
+    background: rgba(110, 23, 40, 0.82);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+  .login-card {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
+  .lc-body {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  body {
+    background: var(--bg-page);
+  }
+  .login-header {
+    background: #6e1728;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .login-card {
+    background: var(--bg-card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .lc-body {
+    background: var(--bg-card);
+  }
+}

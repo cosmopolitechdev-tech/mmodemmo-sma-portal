@@ -1,0 +1,329 @@
+<!-- Sign-in screen, ported from gas/Login.html. No inline scripts or handlers: login.js wires
+     the data-* attributes. -->
+<!-- ── Full-width header ── -->
+<header class="login-header">
+  <div class="login-header__brand">
+    <span id="systemName"></span>
+  </div>
+</header>
+
+<!-- ── Centered card ── -->
+<main class="login-center">
+  <div class="login-card" role="main">
+    <!-- Card header -->
+    <div class="lc-header">
+      <div class="lc-header__logo" id="lcHeaderLogo">🎓</div>
+      <div class="lc-header__title">Welcome Back</div>
+      <div class="lc-header__sub">Sign in to continue</div>
+    </div>
+
+    <!-- Card body -->
+    <div class="lc-body">
+      <!-- Suspended session banner -->
+      <div id="suspendedBanner" class="suspended-banner" role="alert">
+        ⚠️ Access suspended. Contact the administrator.
+      </div>
+
+      <!-- Tab switcher -->
+      <div class="login-tabs" role="tablist" aria-label="Login type">
+        <button
+          class="login-tab active"
+          id="tabTeacher"
+          role="tab"
+          aria-selected="true"
+          aria-controls="panelTeacher"
+          data-tab="teacher"
+        >
+          👩‍🏫 Teacher Login
+        </button>
+        <button
+          class="login-tab"
+          id="tabAdmin"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panelAdmin"
+          data-tab="admin"
+        >
+          🔒 Admin Login
+        </button>
+      </div>
+
+      <!-- ── Teacher Login Panel ── -->
+      <div
+        class="login-panel active"
+        id="panelTeacher"
+        role="tabpanel"
+        aria-labelledby="tabTeacher"
+      >
+        <div
+          id="teacherAlert"
+          class="login-alert login-alert--error"
+          role="alert"
+        ></div>
+
+        <div class="lc-field">
+          <label class="lc-label" for="teacherStaffId">Staff ID</label>
+          <input
+            class="lc-input"
+            type="text"
+            id="teacherStaffId"
+            placeholder="Enter your Staff ID"
+            maxlength="50"
+            autocomplete="username"
+            inputmode="text"
+            data-enter="teacherLogin"
+          />
+        </div>
+
+        <div class="lc-field">
+          <label class="lc-label" for="teacherPin">PIN</label>
+          <div class="pw-wrapper">
+            <input
+              class="lc-input"
+              type="password"
+              id="teacherPin"
+              placeholder="Enter your 8-character PIN"
+              maxlength="8"
+              autocomplete="current-password"
+              inputmode="text"
+              data-enter="teacherLogin"
+            />
+            <button
+              type="button"
+              class="pw-toggle"
+              aria-label="Show/hide PIN"
+              data-toggle-pw="teacherPin"
+            >
+              👁
+            </button>
+          </div>
+        </div>
+
+        <button
+          class="lc-btn"
+          id="btnTeacherLogin"
+          data-action="teacherLogin"
+        >
+          <span class="btn-label">Sign In</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="lc-foot">
+          Forgot your PIN? Contact the school administrator.
+        </div>
+      </div>
+      <!-- end teacher panel -->
+
+      <!-- ── Admin Login Panel ── -->
+      <div
+        class="login-panel"
+        id="panelAdmin"
+        role="tabpanel"
+        aria-labelledby="tabAdmin"
+      >
+        <div
+          id="adminAlert"
+          class="login-alert login-alert--error"
+          role="alert"
+        ></div>
+
+        <div class="lc-field">
+          <label class="lc-label" for="adminPassword"
+            >Administrator Password</label
+          >
+          <div class="pw-wrapper">
+            <input
+              class="lc-input"
+              type="password"
+              id="adminPassword"
+              placeholder="Enter administrator password"
+              autocomplete="current-password"
+              data-enter="adminLogin"
+            />
+            <button
+              type="button"
+              class="pw-toggle"
+              aria-label="Show/hide password"
+              data-toggle-pw="adminPassword"
+            >
+              👁
+            </button>
+          </div>
+        </div>
+
+        <button class="lc-btn" id="btnAdminLogin" data-action="adminLogin">
+          <span class="btn-label">Sign In as Admin</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <!-- Shown when the password is still the setup default -->
+        <div
+          id="forcedChangeSection"
+          class="recovery-section"
+          aria-hidden="true"
+        >
+          <div class="recovery-title">🔒 Choose a New Admin Password</div>
+          <div
+            id="forcedChangeAlert"
+            class="login-alert login-alert--error"
+            role="alert"
+          ></div>
+          <div class="lc-field">
+            <label class="lc-label" for="forcedNewPassword">New Password</label>
+            <div class="pw-wrapper">
+              <input
+                class="lc-input"
+                type="password"
+                id="forcedNewPassword"
+                placeholder="8+ characters, upper and lower case, a number"
+                maxlength="128"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                class="pw-toggle"
+                aria-label="Show/hide password"
+                data-toggle-pw="forcedNewPassword"
+              >
+                👁
+              </button>
+            </div>
+          </div>
+          <div class="lc-field">
+            <label class="lc-label" for="forcedConfirmPassword"
+              >Confirm New Password</label
+            >
+            <div class="pw-wrapper">
+              <input
+                class="lc-input"
+                type="password"
+                id="forcedConfirmPassword"
+                placeholder="Repeat new password"
+                maxlength="128"
+                autocomplete="new-password"
+                data-enter="forcedPasswordChange"
+              />
+              <button
+                type="button"
+                class="pw-toggle"
+                aria-label="Show/hide password"
+                data-toggle-pw="forcedConfirmPassword"
+              >
+                👁
+              </button>
+            </div>
+          </div>
+          <button
+            class="lc-btn"
+            id="btnForcedChange"
+            data-action="forcedPasswordChange"
+          >
+            <span class="btn-label">Save Password and Sign In</span>
+            <div class="btn-spinner"></div>
+          </button>
+        </div>
+
+        <div class="lc-foot">
+          <a href="#" data-action="toggleRecovery">
+            Lost access? Use your recovery key.
+          </a>
+        </div>
+
+        <!-- Recovery form -->
+        <div
+          id="recoverySection"
+          class="recovery-section"
+          aria-hidden="true"
+        >
+          <div class="recovery-title">🔑 Reset Admin Access</div>
+
+          <div
+            id="recoveryAlert"
+            class="login-alert login-alert--error"
+            role="alert"
+          ></div>
+
+          <div class="lc-field">
+            <label class="lc-label" for="recoveryKey">Recovery Key</label>
+            <input
+              class="lc-input"
+              type="text"
+              id="recoveryKey"
+              placeholder="Paste your recovery key"
+              autocomplete="off"
+              maxlength="40"
+            />
+          </div>
+
+          <div class="lc-field">
+            <label class="lc-label" for="newPassword">New Password</label>
+            <div class="pw-wrapper">
+              <input
+                class="lc-input"
+                type="password"
+                id="newPassword"
+                placeholder="Min. 8 characters"
+                maxlength="128"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                class="pw-toggle"
+                aria-label="Show/hide password"
+                data-toggle-pw="newPassword"
+              >
+                👁
+              </button>
+            </div>
+          </div>
+
+          <div class="lc-field">
+            <label class="lc-label" for="confirmPassword"
+              >Confirm New Password</label
+            >
+            <div class="pw-wrapper">
+              <input
+                class="lc-input"
+                type="password"
+                id="confirmPassword"
+                placeholder="Repeat new password"
+                maxlength="128"
+                autocomplete="new-password"
+              />
+              <button
+                type="button"
+                class="pw-toggle"
+                aria-label="Show/hide password"
+                data-toggle-pw="confirmPassword"
+              >
+                👁
+              </button>
+            </div>
+          </div>
+
+          <button
+            class="lc-btn lc-btn--secondary"
+            id="btnRecover"
+            data-action="recoverAdmin"
+          >
+            <span class="btn-label">Reset Password</span>
+            <div class="btn-spinner"></div>
+          </button>
+        </div>
+        <!-- end recovery form -->
+      </div>
+      <!-- end admin panel -->
+    </div>
+    <!-- end lc-body -->
+  </div>
+  <!-- end login-card -->
+</main>
+
+<!-- Shared UI shell (toast + spinner) -->
+<div id="spinnerOverlay" class="spinner-overlay">
+  <div class="spinner-box">
+    <div class="spinner"></div>
+    <div class="spinner-overlay__text">Please wait…</div>
+  </div>
+</div>
+<div id="toastContainer" class="toast-container"></div>

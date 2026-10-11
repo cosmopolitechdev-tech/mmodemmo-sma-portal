@@ -3060,3 +3060,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 52px;
   }
 }
+
+/* Frosted-glass top bar: what scrolls underneath shows through, softly blurred. Solid where
+   the browser has no backdrop blur or the device asks for reduced transparency. */
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .topbar {
+    background: rgba(110, 23, 40, 0.85);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .topbar {
+    background: #6e1728;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

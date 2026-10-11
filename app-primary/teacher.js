@@ -272,7 +272,7 @@ function startCall_(action, payload) {
 
 // Reads the session, fills the top bar, then loads the profile and builds the tabs.
 function startTeacherDashboard_() {
-  applyPublicBranding(["topbarBrandIcon"], " — Teacher Dashboard");
+  applyPublicBranding(["topbarBrandIcon"], " — Teacher Dashboard", toDisplayCaseName);
 
   var stored = getTeacherSession();
   SESSION.token = stored.token;
@@ -287,8 +287,6 @@ function startTeacherDashboard_() {
   }
 
   document.getElementById("btnLogout").addEventListener("click", doLogout);
-  document.getElementById("topbarTeacherName").textContent = SESSION.teacherName || SESSION.staffId;
-  document.getElementById("topbarStaffId").textContent = SESSION.staffId;
   var initials = (SESSION.teacherName || "?")
     .split(" ")
     .filter(Boolean)
@@ -2335,7 +2333,7 @@ function buildSbaTabContent() {
   var deleteSbaBtn = document.createElement("button");
   deleteSbaBtn.id = "btnDeleteSba";
   deleteSbaBtn.className = "btn btn--danger btn--lg";
-  deleteSbaBtn.textContent = "🗑️ Delete Class Marks";
+  deleteSbaBtn.textContent = "🗑️ Delete SBA Marks";
   deleteSbaBtn.disabled = true;
   deleteSbaBtn.onclick = deleteSbaClassMarksHandler;
   saveRow.appendChild(deleteSbaBtn);
@@ -3086,7 +3084,7 @@ function deleteSbaClassMarksHandler() {
   }
 
   showModal(
-    "Delete Class Marks",
+    "Delete SBA Marks",
     "<p>This will permanently delete <strong>all SBA marks</strong> for <strong>" +
       sanitizeDisplayValue(classLevel) +
       "</strong> — <strong>" +
