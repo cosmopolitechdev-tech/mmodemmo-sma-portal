@@ -2086,6 +2086,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     width: 100%;
   }
 }
+/* Side by side (wider screens): an assignments list is never taller than the form beside it;
+   it scrolls inside its own box, with its header row kept in view. */
+@media (min-width: 901px) {
+  .assignment-panel__body--reflow {
+    align-items: stretch;
+  }
+  .assignment-panel__table-col {
+    position: relative;
+    min-height: 240px;
+  }
+  .assignment-panel__table-col > div {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .assignment-panel__table-col .table-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    margin-bottom: 0 !important;
+  }
+}
 .assignment-panel__header {
   background: var(--bg-card-alt);
   color: var(--accent);

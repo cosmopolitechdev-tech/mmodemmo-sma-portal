@@ -4610,7 +4610,10 @@ function _loadSbaReferenceDataThen(callback) {
   }
   callServer("getSubjectsReference", {}, ADMIN_TOKEN).then(
     function (r) {
-      if (r && r.success) ADMIN_SBA_SUBJECTS_REF = r.subjects || [];
+      if (r && r.success) {
+        ADMIN_SBA_SUBJECTS_REF = r.subjects || [];
+        setSubjectRegistry(r.registry);
+      }
       _checkDone();
     },
     function () {

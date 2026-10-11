@@ -448,6 +448,31 @@ function _getSbaSubjectBandKey(classLevel) {
   return null;
 }
 
+// The desktop's per-year subject registry for the live academic year (getSubjectsReference()
+// sends it); empty until loaded, or from a server that does not send it.
+var SBA_SUBJECT_REGISTRY = [];
+var SBA_BAND_REGISTRY_CATEGORY = {
+  JHS: "JHS",
+  "Basic 4 - 6": "4_6",
+  "Basic 1 - 3": "1_3",
+  "Nursery, KG1 & KG2": "Nursery",
+};
+
+// Stores the registry rows from a getSubjectsReference() reply.
+function setSubjectRegistry(rows) {
+  SBA_SUBJECT_REGISTRY = Array.isArray(rows) ? rows : [];
+}
+
+// The registry rows for one SBA band, in the desktop's own order.
+function _subjectRegistryRowsForBand(bandKey) {
+  var category = SBA_BAND_REGISTRY_CATEGORY[bandKey];
+  return SBA_SUBJECT_REGISTRY.filter(function (row) {
+    return String(row.class_category) === category && String(row.canonical_name || "").trim();
+  }).sort(function (a, b) {
+    return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+  });
+}
+
 // Returns the subject list for a class level, resolving the Ghanaian Language
 // placeholder and subject IDs from the subjects reference where available.
 function getSubjectsForClassLevel(classLevel, ghanaianLanguageName, subjectsReference) {
@@ -466,6 +491,21 @@ function getSubjectsForClassLevel(classLevel, ghanaianLanguageName, subjectsRefe
       .toLowerCase();
     if (key) nameToId[key] = s.subject_id;
   });
+
+  // The desktop's own subject list for this class group (its Subjects & Grading screen), when
+  // the server sent one: it carries renamed subjects (e.g. the local language) and removals.
+  var registryRows = _subjectRegistryRowsForBand(bandKey);
+  if (registryRows.length) {
+    return registryRows.map(function (row) {
+      var name = String(row.canonical_name).trim();
+      var key = name.toLowerCase();
+      return {
+        subjectId: nameToId.hasOwnProperty(key) ? nameToId[key] : null,
+        subjectCode: null,
+        displayName: name,
+      };
+    });
+  }
 
   return SBA_SUBJECTS_MAP[bandKey].map(function (subjectName) {
     if (subjectName === SBA_GHANAIAN_LANGUAGE_TOKEN) {

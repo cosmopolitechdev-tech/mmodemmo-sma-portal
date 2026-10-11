@@ -15,6 +15,8 @@ var MmodemmoApi = (function () {
     message: "The server is taking too long to answer. Check your connection and try again.",
   });
   var TIMEOUT_MS = 60000;
+  // Exports build whole files on the server, which can take minutes on a big school.
+  var EXPORT_TIMEOUT_MS = 330000;
   // Reads are safe to repeat; a failed save or sign-in is never sent twice.
   var RETRYABLE = { NETWORK: true, BAD_RESPONSE: true };
   function isReadOnly(action) {
@@ -43,7 +45,7 @@ var MmodemmoApi = (function () {
     var controller = new AbortController();
     var timer = setTimeout(function () {
       controller.abort();
-    }, TIMEOUT_MS);
+    }, /^export[A-Z]/.test(action) ? EXPORT_TIMEOUT_MS : TIMEOUT_MS);
     return fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },

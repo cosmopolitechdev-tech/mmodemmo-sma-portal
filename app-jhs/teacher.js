@@ -3593,6 +3593,7 @@ function _loadSbaSubjectsReferenceThen(cb) {
     function (res) {
       SBA_SUBJECTS_REFERENCE =
         res && res.success && Array.isArray(res.subjects) ? res.subjects : [];
+      setSubjectRegistry(res && res.success ? res.registry : []);
       SBA_SUBJECTS_REFERENCE_LOADED = true;
       if (cb) cb();
     },
