@@ -107,6 +107,7 @@ function buildAllTeachersSection(container) {
     '<div class="section-header">' +
       '<div><div class="section-header__title">All Teachers</div>' +
       '<div class="section-header__subtitle">Manage teacher accounts, PINs, and status</div></div>' +
+      '<button class="btn btn--outline btn--sm" data-onclick="confirmBulkPINs()" title="Generate PINs for many teachers at once and save them as a PDF">🔑 PINs for All Teachers (PDF)</button>' +
       "</div>" +
       // Academic Year / Term / Week Number context row — mirrors the Teacher Portal's Attendance
       // tab (attCtxRow in TeacherDashboard.html).
@@ -924,6 +925,101 @@ function _executeResetPIN(staffId) {
       hideSpinner();
       showToast(friendlyErrorFrontend(e ? e.message : ""), "error");
     },
+  );
+}
+
+// Inactive teachers never get a PIN from here; the server applies the same rule.
+function confirmBulkPINs() {
+  var eligible = TEACHERS_CACHE.filter(function (t) {
+    return t.account_status !== "Inactive" && !t._renderError;
+  });
+  var missing = eligible.filter(function (t) {
+    return !t.hasPinSet;
+  }).length;
+  showModal(
+    "PINs for all teachers",
+    "<p>Generate PINs for many teachers at once. The PINs are saved in one PDF of cut-out slips, one per teacher.</p>" +
+      '<ul style="margin:var(--space-3) 0;padding-left:var(--space-5);">' +
+      "<li><strong>Teachers without a PIN</strong>: " + missing + " teacher(s). Existing PINs keep working.</li>" +
+      "<li><strong>Replace every PIN</strong>: " + eligible.length + " teacher(s). Every current PIN stops working and every teacher is signed out.</li>" +
+      "</ul>" +
+      '<p style="color:var(--text-secondary);font-size:var(--font-size-sm);">Inactive teachers are skipped. The PINs are shown only in the PDF and cannot be retrieved later.</p>',
+    [
+      { label: "Cancel", cls: "btn--ghost", action: closeModal },
+      {
+        label: "Replace Every PIN",
+        cls: "btn--danger",
+        action: function () {
+          closeModal(function () {
+            _executeBulkPINs(false);
+          });
+        },
+      },
+      {
+        label: "Teachers Without a PIN",
+        cls: "btn--accent",
+        action: function () {
+          closeModal(function () {
+            _executeBulkPINs(true);
+          });
+        },
+      },
+    ],
+  );
+}
+
+function _executeBulkPINs(onlyMissing) {
+  showSpinner();
+  callServer("resetAllTeacherPINs", { onlyMissing: onlyMissing }, ADMIN_TOKEN).then(
+    function (r) {
+      hideSpinner();
+      if (_checkAuthCode(r)) return;
+      if (!r || !r.success) {
+        showToast(r && r.message ? r.message : "Could not generate the PINs.", "error");
+        return;
+      }
+      if (!r.count) {
+        showToast(onlyMissing ? "Every teacher already has a PIN." : "No teachers to give a PIN to.", "info");
+        return;
+      }
+      (r.teachers || []).forEach(function (t) {
+        _refreshTeacherInCache(t.staffId, t.accountStatus);
+        TEACHERS_CACHE.forEach(function (c) {
+          if (c.staff_id === t.staffId) c.hasPinSet = true;
+        });
+      });
+      renderTeacherTable();
+      _showBulkPINsSaved(r);
+    },
+    function (e) {
+      hideSpinner();
+      showToast(friendlyErrorFrontend(e ? e.message : ""), "error");
+    },
+  );
+}
+
+function _showBulkPINsSaved(r) {
+  if (!r.pdfBase64) {
+    showModal(
+      "PINs changed, PDF not created",
+      "<p>New PINs were set for " + r.count + " teacher(s), but the PDF could not be created. " +
+        "Generate them again with <strong>Replace Every PIN</strong>, or reset each teacher with the 🔑 PIN button.</p>",
+      [{ label: "Close", cls: "btn--ghost", action: closeModal }],
+    );
+    return;
+  }
+  var save = function () {
+    downloadFile(r.pdfBase64, r.pdfFilename || "Teacher_PINs.pdf", "application/pdf");
+  };
+  save();
+  showModal(
+    "PINs ready for " + r.count + " teacher(s)",
+    "<p>The PDF of PIN slips is downloading. If it did not, tap <strong>Save PDF Again</strong>.</p>" +
+      '<div class="pin-warning">Keep the PDF safe until each teacher has their slip. Once this dialog is closed, the PINs cannot be shown again.</div>',
+    [
+      { label: "📄 Save PDF Again", cls: "btn--outline", action: save },
+      { label: "I have saved the PDF", cls: "btn--accent", action: closeModal },
+    ],
   );
 }
 
@@ -6722,6 +6818,30 @@ function issueSyncCode() {
         showToast("Could not issue a new sync code.", "error");
         return;
       }
+      var buttons = [
+        {
+          label: "📋 Copy Code",
+          cls: "btn--accent",
+          action: function () {
+            copyTextToClipboard(
+              r.connectionCode,
+              "Sync code copied.",
+              "Could not copy automatically. Select the code and copy it.",
+            );
+          },
+        },
+      ];
+      // On a phone, a PDF is easier to send to the school computer than pasted text.
+      if (r.pdfBase64) {
+        buttons.push({
+          label: "📄 Save to PDF",
+          cls: "btn--outline",
+          action: function () {
+            downloadFile(r.pdfBase64, r.pdfFilename || "Desktop_Sync_Code.pdf", "application/pdf");
+          },
+        });
+      }
+      buttons.push({ label: "Close", cls: "btn--ghost", action: closeModal });
       showModal(
         "New sync code",
         "<p>In the Desktop Application on the new computer, open <strong>Connect to Portal</strong> and paste this code. " +
@@ -6729,20 +6849,7 @@ function issueSyncCode() {
           '<textarea class="form-control" id="newSyncCodeBox" readonly rows="4" style="font-family:var(--font-mono);font-size:var(--font-size-xs);word-break:break-all;">' +
           sanitizeDisplayValue(r.connectionCode) +
           "</textarea>",
-        [
-          {
-            label: "📋 Copy Code",
-            cls: "btn--accent",
-            action: function () {
-              copyTextToClipboard(
-                r.connectionCode,
-                "Sync code copied.",
-                "Could not copy automatically. Select the code and copy it.",
-              );
-            },
-          },
-          { label: "Close", cls: "btn--ghost", action: closeModal },
-        ],
+        buttons,
       );
     },
     function (e) {
@@ -6917,6 +7024,7 @@ registerPageActions({
   changeAdminPassword: changeAdminPassword,
   clearSearchBox: clearSearchBox,
   closeSidebar: closeSidebar,
+  confirmBulkPINs: confirmBulkPINs,
   confirmIssueSyncCode: confirmIssueSyncCode,
   copyPortalLink: copyPortalLink,
   deactivateTeacher: deactivateTeacher,
