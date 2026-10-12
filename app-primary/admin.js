@@ -106,7 +106,6 @@ function buildAllTeachersSection(container) {
     '<div class="section-header">' +
       '<div><div class="section-header__title">All Teachers</div>' +
       '<div class="section-header__subtitle">Manage teacher accounts, PINs, and status</div></div>' +
-      '<button class="btn btn--outline btn--sm" data-onclick="confirmBulkPINs()" title="Generate PINs for many teachers at once and save them as a PDF">🔑 PINs for All Teachers (PDF)</button>' +
       "</div>" +
       // Academic Year / Term / Week Number context row — mirrors the Teacher Portal's Attendance
       // tab (attCtxRow in TeacherDashboard.html).
@@ -176,6 +175,7 @@ function buildAllTeachersSection(container) {
       '<option value="Locked">Locked</option>' +
       '<option value="Pending">Pending</option>' +
       "</select>" +
+      '<button class="btn btn--outline" data-onclick="confirmBulkPINs()" title="Make PINs for many teachers at once and save them as a PDF">🔑 PINs for All Teachers (PDF)</button>' +
       "</div>" +
       '<div id="teacherTableWrapper" class="table-wrapper">' +
       '<div class="loading-state"><div class="spinner spinner--sm"></div> Loading teachers…</div>' +
@@ -875,17 +875,17 @@ function confirmBulkPINs() {
     return !t.hasPinSet;
   }).length;
   showModal(
-    "PINs for all teachers",
-    "<p>Generate PINs for many teachers at once. The PINs are saved in one PDF of cut-out slips, one per teacher.</p>" +
+    "Make teacher PINs",
+    "<p>Who should get a new PIN?</p>" +
       '<ul style="margin:var(--space-3) 0;padding-left:var(--space-5);">' +
-      "<li><strong>Teachers without a PIN</strong>: " + missing + " teacher(s). Existing PINs keep working.</li>" +
-      "<li><strong>Replace every PIN</strong>: " + eligible.length + " teacher(s). Every current PIN stops working and every teacher is signed out.</li>" +
+      "<li><strong>Teachers Without a PIN</strong>: " + missing + " teacher(s) who have no PIN yet. Everyone else keeps their PIN.</li>" +
+      "<li><strong>All Teachers</strong>: " + eligible.length + " teacher(s) get a new PIN. Their old PINs stop working and they must sign in again.</li>" +
       "</ul>" +
-      '<p style="color:var(--text-secondary);font-size:var(--font-size-sm);">Inactive teachers are skipped. The PINs are shown only in the PDF and cannot be retrieved later.</p>',
+      '<p style="color:var(--text-secondary);font-size:var(--font-size-sm);">The PINs download as a PDF. Print it, cut out the slips and give each teacher their own. Inactive teachers are left out.</p>',
     [
       { label: "Cancel", cls: "btn--ghost", action: closeModal },
       {
-        label: "Replace Every PIN",
+        label: "All Teachers",
         cls: "btn--danger",
         action: function () {
           closeModal(function () {
@@ -939,9 +939,9 @@ function _executeBulkPINs(onlyMissing) {
 function _showBulkPINsSaved(r) {
   if (!r.pdfBase64) {
     showModal(
-      "PINs changed, PDF not created",
-      "<p>New PINs were set for " + r.count + " teacher(s), but the PDF could not be created. " +
-        "Generate them again with <strong>Replace Every PIN</strong>, or reset each teacher with the 🔑 PIN button.</p>",
+      "PDF not made",
+      "<p>" + r.count + " teacher(s) got a new PIN, but the PDF could not be made, so you cannot see the PINs. " +
+        "Try again: click <strong>PINs for All Teachers (PDF)</strong> and choose <strong>All Teachers</strong>.</p>",
       [{ label: "Close", cls: "btn--ghost", action: closeModal }],
     );
     return;
@@ -951,12 +951,12 @@ function _showBulkPINsSaved(r) {
   };
   save();
   showModal(
-    "PINs ready for " + r.count + " teacher(s)",
-    "<p>The PDF of PIN slips is downloading. If it did not, tap <strong>Save PDF Again</strong>.</p>" +
-      '<div class="pin-warning">Keep the PDF safe until each teacher has their slip. Once this dialog is closed, the PINs cannot be shown again.</div>',
+    "PINs saved to PDF",
+    "<p>The PDF with " + r.count + " PIN(s) is downloading. If you cannot find it, tap <strong>Download Again</strong>.</p>" +
+      '<div class="pin-warning">Keep the PDF safe. After you close this box, the PINs cannot be shown again.</div>',
     [
-      { label: "📄 Save PDF Again", cls: "btn--outline", action: save },
-      { label: "I have saved the PDF", cls: "btn--accent", action: closeModal },
+      { label: "📄 Download Again", cls: "btn--outline", action: save },
+      { label: "Done", cls: "btn--accent", action: closeModal },
     ],
   );
 }
