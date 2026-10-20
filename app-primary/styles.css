@@ -1325,26 +1325,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   text-align: left;
   font-weight: 500;
 }
-.levy-grid .col-partial-amt {
-  width: 130px;
-  text-align: center;
-}
-.levy-partial-amt {
-  font-size: var(--font-size-sm);
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  /* Centered to match the rest of the Daily Levy grid columns. */
-  text-align: center;
-  font-family: var(--font-mono);
-}
-.levy-partial-amt:focus {
-  border-color: var(--border-focus);
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(142, 30, 53, 0.15);
-}
 .levy-grid .col-amount {
   /* Centered to match the rest of the Daily Levy grid columns. */
   text-align: center;
@@ -1375,7 +1355,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .levy-radio-label.paid input[type="radio"] {
   accent-color: var(--success);
 }
-.levy-radio-label.partial input[type="radio"] {
+.levy-radio-label.absent input[type="radio"] {
   accent-color: var(--warning);
 }
 .levy-radio-label.notpaid input[type="radio"] {
@@ -1754,9 +1734,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 .summary-cell--paid .summary-cell__value {
   color: var(--success);
-}
-.summary-cell--partial .summary-cell__value {
-  color: var(--accent);
 }
 .summary-cell--notpaid .summary-cell__value {
   color: var(--error);

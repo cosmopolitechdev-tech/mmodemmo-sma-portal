@@ -932,6 +932,7 @@ function renderProfileTab() {
     .toLowerCase();
   var primaryChecked = storedLevel === "primary" ? "checked" : "";
   var jhsChecked = storedLevel === "jhs" ? "checked" : "";
+  var bothChecked = storedLevel === "both" ? "checked" : "";
 
   var radioBar = document.createElement("div");
   radioBar.id = "profileSchoolLevelBar";
@@ -955,6 +956,12 @@ function renderProfileTab() {
       jhsChecked +
       " " +
       'style="width:16px;height:16px;cursor:pointer;"> JHS' +
+      "</label>" +
+      '<label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;">' +
+      '<input type="radio" name="profileSchoolLevel" value="both" ' +
+      bothChecked +
+      " " +
+      'style="width:16px;height:16px;cursor:pointer;"> Both (Primary &amp; JHS)' +
       "</label>" +
       "</div>" +
       (!storedLevel
@@ -1095,7 +1102,7 @@ function saveProfile() {
       setHtml(
         errDiv,
         "<strong>Please fix the following:</strong><ul>" +
-          "<li>School Level is required — select Primary or JHS.</li>" +
+          "<li>School Level is required — select Primary, JHS or Both.</li>" +
           "</ul>",
       );
       errDiv.style.display = "block";
@@ -1909,12 +1916,12 @@ function buildLevyTabContent() {
     '<div class="summary-cell summary-cell--paid">' +
       '<div class="summary-cell__label">Paid</div>' +
       '<div class="summary-cell__value" id="sumPaidCount">0</div></div>' +
-      '<div class="summary-cell summary-cell--partial">' +
-      '<div class="summary-cell__label">Partial</div>' +
-      '<div class="summary-cell__value" id="sumPartialCount">0</div></div>' +
       '<div class="summary-cell summary-cell--notpaid">' +
       '<div class="summary-cell__label">Not Paid</div>' +
       '<div class="summary-cell__value" id="sumNotPaidCount">0</div></div>' +
+      '<div class="summary-cell summary-cell--absent">' +
+      '<div class="summary-cell__label">Absent</div>' +
+      '<div class="summary-cell__value" id="sumAbsentCount">0</div></div>' +
       '<div class="summary-cell summary-cell--money">' +
       '<div class="summary-cell__label">Total Collected</div>' +
       '<div class="summary-cell__value" id="sumTotalCollected">GH₵ 0.00</div></div>',
@@ -2273,9 +2280,7 @@ function submitLevy() {
 
   // Location Identity feature: each student may have their own rate
   // (a location override), so this cap check is per-student now
-  // instead of comparing every record against one flat LEVY_AMOUNT.
-  // Server-side saveDailyLevy() remains the authoritative check
-  // either way.
+  // instead of one flat LEVY_AMOUNT; used below to mirror what the server stores.
   var studentRateMap = {};
   LEVY_STUDENTS.forEach(function (s) {
     var loc = s.location_identity_code || "";
@@ -2285,22 +2290,6 @@ function submitLevy() {
         : NaN;
     studentRateMap[s.student_id] = !isNaN(override) ? override : LEVY_AMOUNT;
   });
-
-  var overLimit = collected.records.filter(function (r) {
-    var rate = Object.prototype.hasOwnProperty.call(studentRateMap, r.student_id)
-      ? studentRateMap[r.student_id]
-      : LEVY_AMOUNT;
-    return r.payment_status === "Partial" && r.amount_paid !== null && r.amount_paid > rate;
-  });
-  if (overLimit.length > 0) {
-    showToast(
-      "One or more Amount Paid values exceed that student's " +
-        getLevyLabel("Daily Levy") +
-        " rate. Please correct before saving.",
-      "error",
-    );
-    return;
-  }
 
   var params = {
     classLevel: classLevel,
@@ -2318,11 +2307,7 @@ function submitLevy() {
       LEVY_EXISTING[r.student_id] = r.payment_status;
       // Mirrors what the server just stored for each status.
       LEVY_EXISTING_AMOUNTS[r.student_id] =
-        r.payment_status === "Paid"
-          ? studentRateMap[r.student_id]
-          : r.payment_status === "Partial"
-            ? r.amount_paid
-            : 0;
+        r.payment_status === "Paid" ? studentRateMap[r.student_id] : 0;
     });
     updateDailyLevySummary(
       document.getElementById("levySummary"),
@@ -3669,7 +3654,7 @@ function _initSbaTab() {
   var storedLevel = String(TEACHER_DATA.school_level || "")
     .trim()
     .toLowerCase();
-  SBA_SCHOOL_LEVEL = storedLevel === "jhs" ? "JHS" : "Primary";
+  SBA_SCHOOL_LEVEL = storedLevel === "jhs" ? "JHS" : storedLevel === "both" ? "Both" : "Primary";
   document.getElementById("sbaSchoolLevel").textContent = SBA_SCHOOL_LEVEL;
 
   rebuildSbaClassLevelDropdown();
@@ -3700,7 +3685,12 @@ function rebuildSbaClassLevelDropdown() {
     filteredLevels = assignedLevelsForType.slice().sort();
   } else {
     var schoolLevel = SBA_SCHOOL_LEVEL || "Primary";
-    filteredLevels = getEffectiveClassLevels(schoolLevel, classType);
+    filteredLevels =
+      schoolLevel === "Both"
+        ? getEffectiveClassLevels("Primary", classType).concat(
+            getEffectiveClassLevels("JHS", classType),
+          )
+        : getEffectiveClassLevels(schoolLevel, classType);
   }
 
   var clEl = document.getElementById("sbaClassLevel");

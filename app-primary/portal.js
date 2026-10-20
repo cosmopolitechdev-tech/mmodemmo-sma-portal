@@ -1650,9 +1650,8 @@ function renderDailyLevyGrid(
       "<th>Student Name</th>" +
       '<th class="col-amount">Daily Rate (GH₵)</th>' +
       "<th>Paid</th>" +
-      "<th>Partial</th>" +
       "<th>Not Paid</th>" +
-      '<th class="col-partial-amt">Amount Paid (GH₵)</th>' +
+      "<th>Absent</th>" +
       "</tr></thead>" +
       '<tbody id="levyGridBody"></tbody>' +
       "</table>",
@@ -1696,10 +1695,12 @@ function renderDailyLevyGrid(
         : "";
 
     var chkPaid = existing === "Paid" ? "checked" : "";
-    var chkPartial = existing === "Partial" ? "checked" : "";
     var chkNotPaid = existing === "Not Paid" ? "checked" : "";
-
-    var partialVisible = chkPartial ? "" : "display:none;";
+    var chkAbsent = existing === "Absent" ? "checked" : "";
+    // "Absent" only ever comes from the attendance register, and no fee
+    // can be taken for that day (saveDailyLevy refuses it too).
+    var paidLock =
+      existing === "Absent" ? ' disabled title="Marked absent in the attendance register"' : "";
 
     var tr = document.createElement("tr");
     tr.dataset.sid = sid;
@@ -1726,18 +1727,9 @@ function renderDailyLevyGrid(
         sanitizeDisplayValue(sid) +
         '" value="Paid" ' +
         chkPaid +
+        paidLock +
         ">" +
         "<span>Paid</span>" +
-        "</label>" +
-        "</td>" +
-        "<td>" +
-        '<label class="levy-radio-label partial">' +
-        '<input type="radio" name="levy_' +
-        sanitizeDisplayValue(sid) +
-        '" value="Partial" ' +
-        chkPartial +
-        ">" +
-        "<span>Partial</span>" +
         "</label>" +
         "</td>" +
         "<td>" +
@@ -1750,26 +1742,15 @@ function renderDailyLevyGrid(
         "<span>Not Paid</span>" +
         "</label>" +
         "</td>" +
-        '<td class="col-partial-amt">' +
-        '<input type="number" ' +
-        'class="levy-partial-amt form-control" ' +
-        'data-sid="' +
+        "<td>" +
+        '<label class="levy-radio-label absent">' +
+        '<input type="radio" name="levy_' +
         sanitizeDisplayValue(sid) +
-        '" ' +
-        'min="0.01" ' +
-        'max="' +
-        amtStr +
-        '" ' +
-        'step="0.01" ' +
-        'value="' +
-        (existing === "Partial" && recordedAmount !== undefined
-          ? Number(recordedAmount).toFixed(2)
-          : amtStr) +
-        '" ' +
-        'style="width:110px;' +
-        partialVisible +
-        '" ' +
-        'placeholder="0.00">' +
+        '" value="Absent" ' +
+        chkAbsent +
+        ">" +
+        "<span>Absent</span>" +
+        "</label>" +
         "</td>",
     );
 
@@ -1778,16 +1759,6 @@ function renderDailyLevyGrid(
     // ── Wire radio change listeners ────────────────────────────────────
     tr.querySelectorAll('input[type="radio"]').forEach(function (radio) {
       radio.addEventListener("change", function () {
-        var partialInput = tr.querySelector(".levy-partial-amt");
-        if (radio.value === "Partial") {
-          partialInput.style.display = "";
-          partialInput.focus();
-          partialInput.select();
-        } else {
-          partialInput.style.display = "none";
-          partialInput.value = amtStr;
-          partialInput.classList.remove("is-error");
-        }
         updateDailyLevySummary(
           document.getElementById("levySummary"),
           containerElement,
@@ -1802,49 +1773,6 @@ function renderDailyLevyGrid(
         );
       });
     });
-
-    // ── Also update summary when partial amount changes ──
-    // HTML5 max="<studentRate>" alone doesn't stop typed keystrokes
-    // or give feedback — this adds an error style while over the
-    // limit, and clamps + warns on blur.
-    var partialInput = tr.querySelector(".levy-partial-amt");
-    if (partialInput) {
-      partialInput.addEventListener("input", function () {
-        var amt = parseFloat(partialInput.value);
-        if (!isNaN(amt) && amt > studentRate) {
-          partialInput.classList.add("is-error");
-        } else {
-          partialInput.classList.remove("is-error");
-        }
-        updateDailyLevySummary(
-          document.getElementById("levySummary"),
-          containerElement,
-          levyAmount,
-          students,
-        );
-      });
-      partialInput.addEventListener("blur", function () {
-        var amt = parseFloat(partialInput.value);
-        if (!isNaN(amt) && amt > studentRate) {
-          partialInput.value = amtStr;
-          partialInput.classList.remove("is-error");
-          showToast(
-            "Amount Paid cannot exceed the " +
-              getLevyLabel("Daily Levy") +
-              " rate (GH₵ " +
-              amtStr +
-              "). Adjusted to the maximum.",
-            "warning",
-          );
-          updateDailyLevySummary(
-            document.getElementById("levySummary"),
-            containerElement,
-            levyAmount,
-            students,
-          );
-        }
-      });
-    }
   });
 }
 
@@ -2686,7 +2614,7 @@ function updateAttendanceSummary(summaryContainer, gridContainer, students) {
 function updateDailyLevySummary(summaryContainer, gridContainer, levyAmount, students) {
   if (!summaryContainer || !gridContainer) return;
   var paidCount = 0,
-    partialCount = 0,
+    absentCount = 0,
     notPaidCount = 0,
     totalCollected = 0;
 
@@ -2702,22 +2630,15 @@ function updateDailyLevySummary(summaryContainer, gridContainer, levyAmount, stu
       // rate, not the flat class-wide levyAmount.
       var rowRate = parseFloat(row.dataset.rate);
       totalCollected += !isNaN(rowRate) ? rowRate : levyAmount;
-    } else if (ps === "Partial") {
-      partialCount++;
-      var partialInput = row.querySelector(".levy-partial-amt");
-      if (partialInput) {
-        var amt = parseFloat(partialInput.value);
-        if (!isNaN(amt) && amt > 0) {
-          totalCollected += amt;
-        }
-      }
+    } else if (ps === "Absent") {
+      absentCount++;
     } else if (ps === "Not Paid") {
       notPaidCount++;
     }
   });
 
   _setSummaryCell(summaryContainer, "sumPaidCount", paidCount);
-  _setSummaryCell(summaryContainer, "sumPartialCount", partialCount);
+  _setSummaryCell(summaryContainer, "sumAbsentCount", absentCount);
   _setSummaryCell(summaryContainer, "sumNotPaidCount", notPaidCount);
   _setSummaryCell(summaryContainer, "sumTotalCollected", "GH₵ " + totalCollected.toFixed(2));
 }
@@ -2758,24 +2679,11 @@ function collectDailyLevyValues(gridContainer, students) {
     var sid = row.dataset.sid;
     var radio = row.querySelector('input[type="radio"]:checked');
     if (radio) {
-      var payStatus = radio.value;
-      var amountPaid = null;
-
-      if (payStatus === "Partial") {
-        var partialInput = row.querySelector(".levy-partial-amt");
-        if (partialInput) {
-          var raw = partialInput.value.trim();
-          var parsed = parseFloat(raw);
-          amountPaid = !isNaN(parsed) && parsed > 0 ? parsed : 0;
-        } else {
-          amountPaid = 0;
-        }
-      }
-
+      // The server sets the amount: the student's full rate when Paid, else 0.
       records.push({
         student_id: sid,
-        payment_status: payStatus,
-        amount_paid: amountPaid,
+        payment_status: radio.value,
+        amount_paid: null,
       });
     } else {
       var displayId = row.querySelector("td:first-child");

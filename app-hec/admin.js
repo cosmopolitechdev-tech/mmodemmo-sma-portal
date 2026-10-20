@@ -653,6 +653,8 @@ function _matchSchoolLevel(storedLevel, filterValue) {
   // filterValue is 'primary' or 'jhs' (lowercase, from the <select> options)
   // storedLevel may be free-text: 'Primary', 'JHS', 'Primary School', etc.
   var s = storedLevel.toLowerCase().trim();
+  // A teacher who teaches both levels shows under either filter.
+  if (s === "both") return true;
   if (filterValue === "primary") {
     // Match 'primary', 'primary school', but NOT 'jhs'
     return s.indexOf("primary") !== -1 && s.indexOf("jhs") === -1;
@@ -1388,6 +1390,7 @@ function openEditTeacherModal(staffId) {
     // correct radio is pre-selected based on the stored school_level; fields are enabled immediately.
     var primaryChecked = storedLevel === "primary" ? "checked" : "";
     var jhsChecked = storedLevel === "jhs" ? "checked" : "";
+    var bothChecked = storedLevel === "both" ? "checked" : "";
 
     var bodyHtml =
       // School level radio bar
@@ -1411,6 +1414,14 @@ function openEditTeacherModal(staffId) {
       sanitizeDisplayValue(formId) +
       "',this.value)\"" +
       ' style="width:16px;height:16px;cursor:pointer;"> JHS' +
+      "</label>" +
+      '<label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;">' +
+      '<input type="radio" name="editTchSchoolLevel" value="both" ' +
+      bothChecked +
+      " data-onchange=\"onEditTeacherSchoolLevelChange('" +
+      sanitizeDisplayValue(formId) +
+      "',this.value)\"" +
+      ' style="width:16px;height:16px;cursor:pointer;"> Both (Primary &amp; JHS)' +
       "</label>" +
       "</div>" +
       (!storedLevel
@@ -1503,7 +1514,7 @@ function saveEditTeacher(staffId, formId, configs) {
     if (errDiv) {
       setHtml(
         errDiv,
-        "<strong>Please fix:</strong><ul><li>School Level is required — select Primary or JHS.</li></ul>",
+        "<strong>Please fix:</strong><ul><li>School Level is required — select Primary, JHS or Both.</li></ul>",
       );
       errDiv.style.display = "block";
     }
@@ -1680,6 +1691,9 @@ function buildAddTeacherSection(container) {
       '<label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-base);">' +
       '<input type="radio" id="addTchRadioJHS" name="addTchSchoolLevel" value="jhs" data-onchange="onAddTeacherSchoolLevelChange(this.value)" style="width:18px;height:18px;cursor:pointer;"> JHS' +
       "</label>" +
+      '<label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--font-size-base);">' +
+      '<input type="radio" id="addTchRadioBoth" name="addTchSchoolLevel" value="both" data-onchange="onAddTeacherSchoolLevelChange(this.value)" style="width:18px;height:18px;cursor:pointer;"> Both (Primary &amp; JHS)' +
+      "</label>" +
       "</div>" +
       '<div id="addTchLevelHint" class="form-hint" style="margin-top:var(--space-2);color:var(--color-warning);">You must select a school level before filling in the form.</div>' +
       "</div>" +
@@ -1792,7 +1806,7 @@ function submitAddTeacher() {
   var _schoolLevel = (teacher.school_level || "").trim();
 
   if (!_schoolLevel) {
-    _requiredErrors.push("School Level is required — select Primary or JHS above.");
+    _requiredErrors.push("School Level is required — select Primary, JHS or Both above.");
   } else if (_schoolLevel !== "primary" && _schoolLevel !== "jhs") {
     _requiredErrors.push("School Level must be 'primary' or 'jhs'.");
   }
@@ -6054,7 +6068,7 @@ function _buildRecordsStatsBlockHtml(prefix, statsConfig) {
     );
   }
 
-  // Paid/Partial/Not Paid/Total Collected stat cards for buildLevyRecordsSection() — same
+  // Paid/Absent/Not Paid/Total Collected stat cards for buildLevyRecordsSection() — same
   // .stat-grid/.stat-card classes as the "attendance" branch above (DRY, no new CSS needed).
   if (statsConfig.type === "levy") {
     return (
@@ -6067,10 +6081,10 @@ function _buildRecordsStatsBlockHtml(prefix, statsConfig) {
       prefix +
       'StatPaid">0</div></div>' +
       '<div class="stat-card stat-card--warning">' +
-      '<div class="stat-card__label">Partial</div>' +
+      '<div class="stat-card__label">Absent</div>' +
       '<div class="stat-card__value" id="' +
       prefix +
-      'StatPartial">0</div></div>' +
+      'StatAbsent">0</div></div>' +
       '<div class="stat-card stat-card--error">' +
       '<div class="stat-card__label">Not Paid</div>' +
       '<div class="stat-card__value" id="' +
@@ -6086,9 +6100,8 @@ function _buildRecordsStatsBlockHtml(prefix, statsConfig) {
   }
 
   // Fully Paid/Outstanding/Total Collected/Total Outstanding stat cards for
-  // buildAdmissionFeeRecordsSection() -- no
-  // "Partial" concept here, unlike Daily Levy: amount_paid is a running
-  // total against the rate, so a student is either fully paid or not yet.
+  // buildAdmissionFeeRecordsSection() -- amount_paid is a running total
+  // against the rate, so a student is either fully paid or not yet.
   if (statsConfig.type === "termlyfee") {
     return (
       '<div id="' +
@@ -6387,7 +6400,7 @@ function _loadLevyRecordStats(classLevel, academicYear, term, date) {
         return;
       }
       _setText("levyStatPaid", r.paidCount || 0);
-      _setText("levyStatPartial", r.partialCount || 0);
+      _setText("levyStatAbsent", r.absentCount || 0);
       _setText("levyStatNotPaid", r.notPaidCount || 0);
       _setText("levyStatTotalCollected", "GH₵ " + (r.totalCollected || 0).toFixed(2));
       statsEl.style.display = "grid";

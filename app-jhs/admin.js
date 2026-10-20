@@ -5608,7 +5608,7 @@ function _buildRecordsStatsBlockHtml(prefix, statsConfig) {
     );
   }
 
-  // Paid/Partial/Not Paid/Total Collected stat cards for buildLevyRecordsSection() — same
+  // Paid/Absent/Not Paid/Total Collected stat cards for buildLevyRecordsSection() — same
   // .stat-grid/.stat-card classes as the "attendance" branch above (DRY, no new CSS needed).
   if (statsConfig.type === "levy") {
     return (
@@ -5621,10 +5621,10 @@ function _buildRecordsStatsBlockHtml(prefix, statsConfig) {
       prefix +
       'StatPaid">0</div></div>' +
       '<div class="stat-card stat-card--warning">' +
-      '<div class="stat-card__label">Partial</div>' +
+      '<div class="stat-card__label">Absent</div>' +
       '<div class="stat-card__value" id="' +
       prefix +
-      'StatPartial">0</div></div>' +
+      'StatAbsent">0</div></div>' +
       '<div class="stat-card stat-card--error">' +
       '<div class="stat-card__label">Not Paid</div>' +
       '<div class="stat-card__value" id="' +
@@ -5640,9 +5640,8 @@ function _buildRecordsStatsBlockHtml(prefix, statsConfig) {
   }
 
   // Fully Paid/Outstanding/Total Collected/Total Outstanding stat cards for
-  // buildAdmissionFeeRecordsSection()/buildTuitionFeeRecordsSection() -- no
-  // "Partial" concept here, unlike Daily Levy: amount_paid is a running
-  // total against the rate, so a student is either fully paid or not yet.
+  // buildAdmissionFeeRecordsSection()/buildTuitionFeeRecordsSection() -- amount_paid is a
+  // running total against the rate, so a student is either fully paid or not yet.
   if (statsConfig.type === "termlyfee") {
     return (
       '<div id="' +
@@ -5882,7 +5881,7 @@ function _loadLevyRecordStats(classLevel, academicYear, term, date) {
         return;
       }
       _setText("levyStatPaid", r.paidCount || 0);
-      _setText("levyStatPartial", r.partialCount || 0);
+      _setText("levyStatAbsent", r.absentCount || 0);
       _setText("levyStatNotPaid", r.notPaidCount || 0);
       _setText("levyStatTotalCollected", "GH₵ " + (r.totalCollected || 0).toFixed(2));
       statsEl.style.display = "grid";
