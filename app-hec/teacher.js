@@ -1978,21 +1978,36 @@ function onLevyTabActivated() {
   }
 }
 
-// Returns the teacher's assigned class for Daily Levy, if only one exists.
-function _getLevyAssignedClass() {
-  var levyAssign = SESSION.assignments.find(function (a) {
-    return a.assignment_type === "Daily_Levy";
+// The teacher's Daily Levy classes; several for an "All classes" collector.
+function _getLevyAssignedClasses() {
+  var classes = [];
+  SESSION.assignments.forEach(function (a) {
+    if (a.assignment_type === "Daily_Levy" && a.class_level && classes.indexOf(a.class_level) === -1)
+      classes.push(a.class_level);
   });
-  return levyAssign ? levyAssign.class_level || "" : "";
+  return classes;
+}
+
+// Returns the teacher's first assigned class for Daily Levy.
+function _getLevyAssignedClass() {
+  return _getLevyAssignedClasses()[0] || "";
 }
 
 // Initializes the Daily Levy tab's dropdowns and state.
 function _initLevyTab() {
   _populateSharedContextRow();
+  _loadLevyConfig(_getLevyAssignedClass());
+  preSelectLevyClass();
 
-  var assignedClass = _getLevyAssignedClass();
+  var today = _latestSchoolDayISO();
+  document.getElementById("levyDate").value = today;
+  _validateLevyDate(today);
+  _updateLevyWeekDisplay(today);
+}
 
-  callServer("getDailyLevyConfig", { classLevel: assignedClass }, SESSION.token).then(
+// Loads the Daily Levy rate for a class (each class can have its own).
+function _loadLevyConfig(classLevel) {
+  callServer("getDailyLevyConfig", { classLevel: classLevel }, SESSION.token).then(
     function (res) {
       if (res && res.code === "UNAUTHORIZED") {
         forcedLogout();
@@ -2032,13 +2047,6 @@ function _initLevyTab() {
       showToast("Could not load " + getLevyLabel("Daily Levy") + " amount.", "warning");
     },
   );
-
-  preSelectLevyClass();
-
-  var today = _latestSchoolDayISO();
-  document.getElementById("levyDate").value = today;
-  _validateLevyDate(today);
-  _updateLevyWeekDisplay(today);
 }
 
 // Pre-selects the teacher's assigned class in the Daily Levy tab, if only one exists.
@@ -2070,6 +2078,25 @@ function preSelectLevyClass() {
 
   if (ctEl) ctEl.disabled = true;
   if (clEl) clEl.disabled = true;
+
+  // Several classes: list only those, and reload the rate when the class changes.
+  var classes = _getLevyAssignedClasses();
+  if (clEl && classes.length > 1) {
+    clEl.textContent = "";
+    classes.forEach(function (cl) {
+      var opt = document.createElement("option");
+      opt.value = cl;
+      opt.textContent = cl;
+      clEl.appendChild(opt);
+    });
+    clEl.value = assignedClass;
+    clEl.disabled = false;
+    clEl.onchange = function () {
+      _clearLevyGridState();
+      LEVY_CONFIGURED = false;
+      _loadLevyConfig(clEl.value);
+    };
+  }
 }
 
 // Rebuilds the Daily Levy tab's Class Level dropdown.
