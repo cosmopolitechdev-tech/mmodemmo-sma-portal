@@ -2882,6 +2882,28 @@ function handleSaveWithRetry(saveFunction, params, saveButton, onSuccess) {
           );
           return;
         }
+        // Another collector changed some of these payments after this page loaded.
+        if (result.code === "CONFIRM_OVERWRITE") {
+          _reenable();
+          showModal(
+            "Changed by Another Collector",
+            "<p>" + sanitizeDisplayValue(result.message).replace(/\n/g, "<br>") + "</p>",
+            [
+              { label: "Cancel", cls: "btn--ghost", action: function () { closeModal(); } },
+              {
+                label: "Save Anyway",
+                cls: "btn--accent",
+                action: function () {
+                  closeModal();
+                  var confirmed = {};
+                  confirmed[result.confirmField || "confirmOverwrite"] = true;
+                  _doSave(Object.assign({}, overrideParams, confirmed));
+                },
+              },
+            ],
+          );
+          return;
+        }
         if (!result.success) {
           _showRetry(result.message || "Save failed", false);
           return;

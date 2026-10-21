@@ -3166,6 +3166,11 @@ function _selectTeacherNameSuggestion(prefix, staffId) {
 // an assignment type needs a human-readable name. Admission Fee/Tuition
 // Fee labels go through getLevyLabel() the same way Daily Levy already
 // does, so an admin's custom label names apply here too.
+// Display text for a class_level; "ALL_CLASSES" is the all-classes fee collector marker.
+function _classLevelLabel(classLevel) {
+  return classLevel === "ALL_CLASSES" ? "All classes" : classLevel;
+}
+
 function _assignmentTypeLabel(type) {
   if (type === "Attendance") return "Attendance";
   if (type === "Daily_Levy") return getLevyLabel("Daily Levy");
@@ -3233,6 +3238,13 @@ function rebuildAssignClassLevel(prefix) {
   var clEl = document.getElementById(prefix + "ClassLevel");
   if (!clEl) return;
   clEl.textContent = "";
+  // Fee collection can cover every class; Attendance stays one class per teacher.
+  if (prefix !== "att") {
+    var all = document.createElement("option");
+    all.value = "ALL_CLASSES";
+    all.textContent = "All classes";
+    clEl.appendChild(all);
+  }
   levels.forEach(function (lvl) {
     var o = document.createElement("option");
     o.value = lvl;
@@ -3300,7 +3312,7 @@ function _renderAssignmentTable(assignments, type, prefix) {
           // Display-only escaping — safe for <td> text/title content.
           var staffId = sanitizeDisplayValue(a.staff_id || "");
           var teacherName = sanitizeDisplayValue(a.teacher_name || "");
-          var classLevel = sanitizeDisplayValue(a.class_level || "");
+          var classLevel = sanitizeDisplayValue(_classLevelLabel(a.class_level || ""));
           var assignedAt = sanitizeDisplayValue(a.assigned_at || "—");
           // separate JS-string-safe values for data-onclick="..." attributes.
           var aIdJs = escapeForJsAttr(a.assignment_id || "");
@@ -4142,7 +4154,7 @@ function doAssign(type, prefix) {
         return;
       }
       showToast(
-        "Assigned " + staffId + " to " + classLevel + " (" + _assignmentTypeLabel(type) + ").",
+        "Assigned " + staffId + " to " + _classLevelLabel(classLevel) + " (" + _assignmentTypeLabel(type) + ").",
         "success",
       );
       loadAssignments();
@@ -4209,7 +4221,7 @@ function doReassign(assignmentId, classLevel, currentStaffId, type, prefix) {
     "<p>Reassign <strong>" +
     sanitizeDisplayValue(label) +
     "</strong> duty for <strong>" +
-    sanitizeDisplayValue(classLevel) +
+    sanitizeDisplayValue(_classLevelLabel(classLevel)) +
     "</strong>?</p>" +
     '<p style="margin-top:var(--space-3);color:var(--text-secondary);font-size:var(--font-size-sm);">' +
     "This will revoke the current assignment for Staff ID " +
@@ -4323,7 +4335,7 @@ function _executeReassign(assignmentId, classLevel, type, label, newStaffId) {
             return;
           }
           showToast(
-            "Reassigned " + classLevel + " (" + label + ") to Staff ID " + newStaffId + ".",
+            "Reassigned " + _classLevelLabel(classLevel) + " (" + label + ") to Staff ID " + newStaffId + ".",
             "success",
           );
           loadAssignments();
@@ -4939,6 +4951,7 @@ function buildMockExamsSection(container) {
       '<label class="form-label">Class Level</label>' +
       '<select class="form-control" id="mockFeeAssignClassLevel" style="max-width:220px;">' +
       '<option value="">— Select —</option>' +
+      '<option value="ALL_CLASSES">All Basic 9 classes</option>' +
       MOCK_CLASS_LEVELS.map(function (lvl) {
         var safe = sanitizeDisplayValue(lvl);
         return '<option value="' + safe + '">' + safe + "</option>";
@@ -5077,7 +5090,7 @@ function _renderMockFeeAssignmentPanel(r) {
         "</div>" +
         "</td>" +
         "<td>" +
-        sanitizeDisplayValue(a.classLevel || "") +
+        sanitizeDisplayValue(a.classLevel === "ALL_CLASSES" ? "All Basic 9 classes" : a.classLevel || "") +
         "</td>" +
         "<td>" +
         sourceLabel +
@@ -5150,10 +5163,12 @@ function doReassignMockFeeCollection() {
     "<p>Assign Staff ID <strong>" +
       sanitizeDisplayValue(staffId) +
       "</strong> to collect Mock Exams Fee for <strong>" +
-      sanitizeDisplayValue(classLevel) +
+      sanitizeDisplayValue(classLevel === "ALL_CLASSES" ? "all Basic 9 classes" : classLevel) +
       "</strong>?</p>" +
       '<p style="margin-top:var(--space-3);color:var(--text-secondary);font-size:var(--font-size-sm);">' +
-      "This replaces any teacher currently collecting Mock Exams Fee for this class, and sticks even if this teacher is not the Form/Class Teacher." +
+      (classLevel === "ALL_CLASSES"
+        ? "This adds the teacher as a collector for every Basic 9 class, alongside any teacher already collecting there."
+        : "This replaces any teacher currently collecting Mock Exams Fee for this class, and sticks even if this teacher is not the Form/Class Teacher.") +
       "</p>",
     [
       { label: "Cancel", cls: "btn--ghost", action: closeModal },
@@ -5185,7 +5200,8 @@ function _executeReassignMockFeeCollection(staffId, classLevel) {
         return;
       }
       showToast(
-        "Assigned " + staffId + " to collect Mock Exams Fee for " + classLevel + ".",
+        "Assigned " + staffId + " to collect Mock Exams Fee for " +
+          (classLevel === "ALL_CLASSES" ? "all Basic 9 classes" : classLevel) + ".",
         "success",
       );
       var staffInput = document.getElementById("mockFeeAssignStaff");

@@ -3005,7 +3005,8 @@ function buildMockFeeTabContent() {
     "flex-wrap:wrap;margin-bottom:var(--space-4);font-size:var(--font-size-sm);font-weight:600;";
   setHtml(
     ctxRow,
-    '<span>Class: <strong id="mockFeeClassDisplay">—</strong></span>' +
+    '<span>Class: <strong id="mockFeeClassDisplay">—</strong>' +
+      '<select id="mockFeeClassSelect" class="form-control" style="display:none;max-width:180px;"></select></span>' +
       '<span>Rate: <strong id="mockFeeRateDisplay">—</strong></span>',
   );
   panel.appendChild(ctxRow);
@@ -3040,11 +3041,21 @@ function buildMockFeeTabContent() {
 
 // Runs setup when the Mock Exams Fee Collection tab is activated.
 function onMockFeeTabActivated() {
-  CURRENT_MOCK_FEE_CLASS = MOCK_FEE_INFO.classLevel || "";
+  var classes =
+    MOCK_FEE_INFO.classLevels || (MOCK_FEE_INFO.classLevel ? [MOCK_FEE_INFO.classLevel] : []);
+  if (classes.indexOf(CURRENT_MOCK_FEE_CLASS) === -1) CURRENT_MOCK_FEE_CLASS = classes[0] || "";
   var classDisplay = document.getElementById("mockFeeClassDisplay");
   if (classDisplay) {
     classDisplay.textContent = CURRENT_MOCK_FEE_CLASS || "Not assigned";
   }
+  _fillCollectionClassPicker("mockFeeClassSelect", "mockFeeClassDisplay", classes, function (cl) {
+    CURRENT_MOCK_FEE_CLASS = cl;
+    MOCK_FEE_STUDENTS = [];
+    document.getElementById("mockFeeGridWrapper").textContent = "";
+    document.getElementById("btnSaveMockFee").disabled = true;
+  });
+  var picker = document.getElementById("mockFeeClassSelect");
+  if (picker && CURRENT_MOCK_FEE_CLASS) picker.value = CURRENT_MOCK_FEE_CLASS;
   var loadBtn = document.getElementById("btnLoadMockFee");
   if (loadBtn) loadBtn.disabled = !CURRENT_MOCK_FEE_CLASS;
 }
@@ -3200,7 +3211,14 @@ function submitMockFeePayments() {
       invalid.push(sid);
       return;
     }
-    records.push({ student_id: sid, amount_paid: amt });
+    var loaded = MOCK_FEE_STUDENTS.find(function (x) {
+      return x.student_id === sid;
+    });
+    records.push({
+      student_id: sid,
+      amount_paid: amt,
+      loaded_amount: loaded ? parseFloat(loaded.amount_paid) || 0 : null,
+    });
   });
 
   if (invalid.length > 0) {
@@ -3256,11 +3274,35 @@ function _termlyFeeLabelKey(feeType) {
 // SESSION.assignments, no extra round trip" pattern, since Phase B put
 // Admission_Fee/Tuition_Fee in the same Teacher_Assignments table
 // Daily_Levy already uses.
-function _getTermlyFeeAssignedClass(feeType) {
-  var found = SESSION.assignments.find(function (a) {
-    return a.assignment_type === feeType;
+// Every class this teacher collects feeType for (an "All classes" collector gets them all).
+function _getTermlyFeeAssignedClasses(feeType) {
+  var classes = [];
+  SESSION.assignments.forEach(function (a) {
+    if (a.assignment_type === feeType && classes.indexOf(a.class_level) === -1) {
+      classes.push(a.class_level);
+    }
   });
-  return found ? found.class_level || "" : "";
+  return classes;
+}
+
+// Shows a class picker when there is more than one class; calls onPick(class) on change.
+function _fillCollectionClassPicker(selectId, displayId, classes, onPick) {
+  var sel = document.getElementById(selectId);
+  var display = document.getElementById(displayId);
+  if (!sel || !display) return;
+  sel.textContent = "";
+  classes.forEach(function (cl) {
+    var o = document.createElement("option");
+    o.value = cl;
+    o.textContent = cl;
+    sel.appendChild(o);
+  });
+  var many = classes.length > 1;
+  sel.style.display = many ? "" : "none";
+  display.style.display = many ? "none" : "";
+  sel.onchange = function () {
+    onPick(sel.value);
+  };
 }
 
 function buildTermlyFeeTabContent(feeType, prefix) {
@@ -3277,7 +3319,10 @@ function buildTermlyFeeTabContent(feeType, prefix) {
     ctxRow,
     '<span>Class: <strong id="' +
       prefix +
-      'ClassDisplay">—</strong></span>' +
+      'ClassDisplay">—</strong>' +
+      '<select id="' +
+      prefix +
+      'ClassSelect" class="form-control" style="display:none;max-width:180px;"></select></span>' +
       '<span>Rate: <strong id="' +
       prefix +
       'RateDisplay">—</strong></span>',
@@ -3318,14 +3363,23 @@ function buildTermlyFeeTabContent(feeType, prefix) {
 
 // Runs setup when an Admission Fee / Tuition Fee tab is activated.
 function onTermlyFeeTabActivated(feeType, prefix) {
-  var assignedClass = _getTermlyFeeAssignedClass(feeType);
-  TERMLY_FEE_STATE[feeType].assignedClass = assignedClass;
+  var classes = _getTermlyFeeAssignedClasses(feeType);
+  var state = TERMLY_FEE_STATE[feeType];
+  if (classes.indexOf(state.assignedClass) === -1) state.assignedClass = classes[0] || "";
   var classDisplay = document.getElementById(prefix + "ClassDisplay");
   if (classDisplay) {
-    classDisplay.textContent = assignedClass || "Not assigned";
+    classDisplay.textContent = state.assignedClass || "Not assigned";
   }
+  _fillCollectionClassPicker(prefix + "ClassSelect", prefix + "ClassDisplay", classes, function (cl) {
+    state.assignedClass = cl;
+    state.students = [];
+    document.getElementById(prefix + "GridWrapper").textContent = "";
+    document.getElementById("btnSave" + prefix).disabled = true;
+  });
+  var picker = document.getElementById(prefix + "ClassSelect");
+  if (picker && state.assignedClass) picker.value = state.assignedClass;
   var loadBtn = document.getElementById("btnLoad" + prefix);
-  if (loadBtn) loadBtn.disabled = !assignedClass;
+  if (loadBtn) loadBtn.disabled = !state.assignedClass;
 }
 
 // Loads students + existing payments for an Admission Fee / Tuition Fee tab.
@@ -3497,7 +3551,15 @@ function submitTermlyFeePayments(feeType, prefix) {
       invalid.push(sid);
       return;
     }
-    records.push({ student_id: sid, amount_paid: amt });
+    // loaded_amount lets the server skip untouched rows and spot another collector's change.
+    var loaded = state.students.find(function (x) {
+      return x.student_id === sid;
+    });
+    records.push({
+      student_id: sid,
+      amount_paid: amt,
+      loaded_amount: loaded ? parseFloat(loaded.amount_paid) || 0 : null,
+    });
   });
 
   if (invalid.length > 0) {
