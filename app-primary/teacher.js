@@ -2190,6 +2190,12 @@ function submitLevy() {
     studentRateMap[s.student_id] = !isNaN(override) ? override : LEVY_AMOUNT;
   });
 
+  // The server writes only rows changed here, and asks before clearing another
+  // collector's payment.
+  collected.records.forEach(function (r) {
+    r.loaded_status = LEVY_EXISTING[r.student_id] || "";
+  });
+
   var params = {
     classLevel: classLevel,
     academicYear: academicYear,
@@ -2200,13 +2206,18 @@ function submitLevy() {
   };
 
   handleSaveWithRetry("saveDailyLevy", params, saveBtn, function () {
+    var oldAmounts = LEVY_EXISTING_AMOUNTS;
     LEVY_EXISTING = {};
     LEVY_EXISTING_AMOUNTS = {};
     collected.records.forEach(function (r) {
       LEVY_EXISTING[r.student_id] = r.payment_status;
-      // Mirrors what the server just stored for each status.
+      // Mirrors what the server just stored; it leaves an untouched row as it was.
       LEVY_EXISTING_AMOUNTS[r.student_id] =
-        r.payment_status === "Paid" ? studentRateMap[r.student_id] : 0;
+        r.payment_status === r.loaded_status
+          ? oldAmounts[r.student_id] || 0
+          : r.payment_status === "Paid"
+            ? studentRateMap[r.student_id]
+            : 0;
     });
     updateDailyLevySummary(
       document.getElementById("levySummary"),
