@@ -24,6 +24,8 @@ var LEVY_CONFIGURED = false;
 var LEVY_LOCATION_RATES = {};
 var ATT_SCHOOL_LEVEL = "";
 var LEVY_SCHOOL_LEVEL = "";
+// The Daily Levy class last picked by a collector who has several (kept across tab switches).
+var LEVY_PICKED_CLASS = "";
 var SBA_SCHOOL_LEVEL = "";
 var SBA_STUDENTS = [];
 var SBA_EXISTING = {};
@@ -1930,9 +1932,19 @@ function _getLevyAssignedClasses() {
   return classes;
 }
 
-// Returns the teacher's first assigned class for Daily Levy.
+// The Daily Levy class to work on: the one last picked, else the first assigned.
 function _getLevyAssignedClass() {
-  return _getLevyAssignedClasses()[0] || "";
+  var classes = _getLevyAssignedClasses();
+  return classes.indexOf(LEVY_PICKED_CLASS) !== -1 ? LEVY_PICKED_CLASS : classes[0] || "";
+}
+
+// True when the loaded Daily Levy grid has marks that differ from what was saved.
+function _levyGridHasUnsavedChanges() {
+  var grid = document.getElementById("levyGridWrapper");
+  if (!grid || !LEVY_STUDENTS.length) return false;
+  return collectDailyLevyValues(grid, LEVY_STUDENTS).records.some(function (r) {
+    return r.payment_status !== (LEVY_EXISTING[r.student_id] || "");
+  });
 }
 
 // Initializes the Daily Levy tab's dropdowns and state.
@@ -1941,7 +1953,8 @@ function _initLevyTab() {
   _loadLevyConfig(_getLevyAssignedClass());
   preSelectLevyClass();
 
-  var today = _latestSchoolDayISO();
+  // A loaded list keeps its own date when the tab is opened again.
+  var today = CURRENT_LEVY_DATE || _latestSchoolDayISO();
   document.getElementById("levyDate").value = today;
   _validateLevyDate(today);
   _updateLevyWeekDisplay(today);
@@ -1951,6 +1964,7 @@ function _initLevyTab() {
 function _loadLevyConfig(classLevel) {
   callServer("getDailyLevyConfig", { classLevel: classLevel }, SESSION.token).then(
     function (res) {
+      if (_getLevyAssignedClass() !== classLevel) return; // reply for a class no longer picked
       if (res && res.code === "UNAUTHORIZED") {
         forcedLogout();
         return;
@@ -2030,6 +2044,14 @@ function preSelectLevyClass() {
     clEl.value = assignedClass;
     clEl.disabled = false;
     clEl.onchange = function () {
+      if (
+        _levyGridHasUnsavedChanges() &&
+        !confirm("Your marks for " + _getLevyAssignedClass() + " are not saved yet. Switch class and discard them?")
+      ) {
+        clEl.value = _getLevyAssignedClass();
+        return;
+      }
+      LEVY_PICKED_CLASS = clEl.value;
       _clearLevyGridState();
       LEVY_CONFIGURED = false;
       _loadLevyConfig(clEl.value);
@@ -3091,7 +3113,7 @@ function onMockFeeTabActivated() {
     MOCK_FEE_STUDENTS = [];
     document.getElementById("mockFeeGridWrapper").textContent = "";
     document.getElementById("btnSaveMockFee").disabled = true;
-  });
+  }, "mockFeeGridWrapper");
   var picker = document.getElementById("mockFeeClassSelect");
   if (picker && CURRENT_MOCK_FEE_CLASS) picker.value = CURRENT_MOCK_FEE_CLASS;
   var loadBtn = document.getElementById("btnLoadMockFee");
@@ -3324,7 +3346,7 @@ function _getTermlyFeeAssignedClasses(feeType) {
 }
 
 // Shows a class picker when there is more than one class; calls onPick(class) on change.
-function _fillCollectionClassPicker(selectId, displayId, classes, onPick) {
+function _fillCollectionClassPicker(selectId, displayId, classes, onPick, gridId) {
   var sel = document.getElementById(selectId);
   var display = document.getElementById(displayId);
   if (!sel || !display) return;
@@ -3338,7 +3360,27 @@ function _fillCollectionClassPicker(selectId, displayId, classes, onPick) {
   var many = classes.length > 1;
   sel.style.display = many ? "" : "none";
   display.style.display = many ? "none" : "";
+  // Typed amounts are lost on a class switch, so ask first when any were changed.
+  sel.onfocus = function () {
+    sel.dataset.current = sel.value;
+  };
   sel.onchange = function () {
+    var grid = gridId ? document.getElementById(gridId) : null;
+    var changed =
+      grid &&
+      Array.prototype.some.call(grid.querySelectorAll("input"), function (input) {
+        return input.value !== input.defaultValue;
+      });
+    var previous = sel.dataset.current || "";
+    if (
+      changed &&
+      previous &&
+      !confirm("Your entries for " + previous + " are not saved yet. Switch class and discard them?")
+    ) {
+      sel.value = previous;
+      return;
+    }
+    sel.dataset.current = sel.value;
     onPick(sel.value);
   };
 }
@@ -3413,7 +3455,7 @@ function onTermlyFeeTabActivated(feeType, prefix) {
     state.students = [];
     document.getElementById(prefix + "GridWrapper").textContent = "";
     document.getElementById("btnSave" + prefix).disabled = true;
-  });
+  }, prefix + "GridWrapper");
   var picker = document.getElementById(prefix + "ClassSelect");
   if (picker && state.assignedClass) picker.value = state.assignedClass;
   var loadBtn = document.getElementById("btnLoad" + prefix);
