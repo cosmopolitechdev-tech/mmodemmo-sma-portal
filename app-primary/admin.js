@@ -132,6 +132,9 @@ function buildTeacherDetailsSection(container) {
       '<option value="Locked">Locked</option>' +
       '<option value="Pending">Pending</option>' +
       "</select>" +
+      '<select class="filter-select" id="teacherDetailFormat" title="File type for the download">' +
+      '<option value="xlsx">Excel (.xlsx)</option><option value="pdf">PDF</option></select>' +
+      '<button class="btn btn--accent btn--sm" data-onclick="downloadTeacherDetails()" title="Download the teachers listed below with every field">📥 Download Teacher Records</button>' +
       '<span class="text-muted" id="teacherDetailCount" style="font-size:var(--font-size-sm);"></span>' +
       "</div>" +
       '<div id="teacherDetailsWrapper" class="table-wrapper">' +
@@ -212,8 +215,15 @@ function _prettyFieldName(key) {
     .join(" ");
 }
 
-// Dates as DD/MM/YYYY (with the time when there is one); blanks as a dash.
-function _teacherDetailValue(value) {
+// Stored as 1/0; shown as Yes/No.
+var TEACHER_DETAIL_YES_NO = ["is_form_teacher", "is_head_teacher", "is_assistant_head"];
+
+// Dates as DD/MM/YYYY (with the time when there is one); Yes/No fields as Yes/No; blanks as a dash.
+function _teacherDetailValue(value, key) {
+  if (TEACHER_DETAIL_YES_NO.indexOf(key) !== -1) {
+    var yn = String(value === null || value === undefined ? "" : value).trim().toLowerCase();
+    return yn === "1" || yn === "yes" || yn === "true" ? "Yes" : "No";
+  }
   if (value === null || value === undefined || String(value).trim() === "") return "—";
   if (value === true) return "Yes";
   if (value === false) return "No";
@@ -227,19 +237,32 @@ function _teacherDetailValue(value) {
   return s;
 }
 
-function renderTeacherDetails() {
-  var wrapper = document.getElementById("teacherDetailsWrapper");
-  if (!wrapper) return;
+// The teachers the search box and status filter leave in the list.
+function _teacherDetailRows() {
   var queryEl = document.getElementById("teacherDetailSearch");
   var statusEl = document.getElementById("teacherDetailStatus");
   var query = queryEl ? queryEl.value.trim().toLowerCase() : "";
   var status = statusEl ? statusEl.value : "";
-  var rows = TEACHERS_CACHE.filter(function (t) {
+  return TEACHERS_CACHE.filter(function (t) {
     if (status && String(t.account_status || "") !== status) return false;
     if (!query) return true;
     var name = [t.first_name, t.middle_name, t.surname].join(" ").toLowerCase();
     return name.indexOf(query) !== -1 || String(t.staff_id || "").toLowerCase().indexOf(query) !== -1;
   });
+}
+
+function _teacherDetailName(t) {
+  return [t.first_name, t.middle_name, t.surname]
+    .filter(function (p) {
+      return p && String(p).trim();
+    })
+    .join(" ");
+}
+
+function renderTeacherDetails() {
+  var wrapper = document.getElementById("teacherDetailsWrapper");
+  if (!wrapper) return;
+  var rows = _teacherDetailRows();
   var countEl = document.getElementById("teacherDetailCount");
   if (countEl) {
     countEl.textContent =
@@ -261,18 +284,14 @@ function renderTeacherDetails() {
     }).join("");
   var body = rows
     .map(function (t) {
-      var name = [t.first_name, t.middle_name, t.surname]
-        .filter(function (p) {
-          return p && String(p).trim();
-        })
-        .join(" ");
+      var name = _teacherDetailName(t);
       return (
         "<tr>" +
         '<td class="col-sticky-name" style="white-space:nowrap;font-weight:600;">' +
         sanitizeDisplayValue(name || t.staff_id) +
         "</td>" +
         TEACHER_DETAIL_COLUMNS.map(function (c) {
-          return '<td style="white-space:nowrap;">' + sanitizeDisplayValue(_teacherDetailValue(t[c.key])) + "</td>";
+          return '<td style="white-space:nowrap;">' + sanitizeDisplayValue(_teacherDetailValue(t[c.key], c.key)) + "</td>";
         }).join("") +
         "</tr>"
       );
@@ -285,6 +304,199 @@ function renderTeacherDetails() {
     '<table class="table table--striped"><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table>",
   );
   wrapper.scrollLeft = scrollLeft;
+}
+
+// Downloads the teachers in the list with every column, as Excel or PDF (format picker).
+function downloadTeacherDetails() {
+  var rows = _teacherDetailRows();
+  if (rows.length === 0 || TEACHER_DETAIL_COLUMNS.length === 0) {
+    showToast("There are no teachers in the list to download.", "warning");
+    return;
+  }
+  var formatEl = document.getElementById("teacherDetailFormat");
+  if (formatEl && formatEl.value === "pdf") {
+    var staffIds = rows.map(function (t) {
+      return String(t.staff_id);
+    });
+    showSpinner();
+    callServer("exportTeacherDetailsPdf", { columns: TEACHER_DETAIL_COLUMNS, staffIds: staffIds }, ADMIN_TOKEN).then(
+      function (r) {
+        hideSpinner();
+        if (_checkAuthCode(r)) return;
+        if (!r || !r.success) {
+          showToast((r && r.message) || "Could not make the PDF.", "error");
+          return;
+        }
+        downloadFile(r.base64, r.filename, r.mimeType);
+      },
+      function (e) {
+        hideSpinner();
+        showToast(friendlyErrorFrontend(e ? e.message : ""), "error");
+      },
+    );
+    return;
+  }
+  var table = [
+    ["Teacher"].concat(
+      TEACHER_DETAIL_COLUMNS.map(function (c) {
+        return c.label;
+      }),
+    ),
+  ].concat(
+    rows.map(function (t) {
+      return [_teacherDetailName(t) || t.staff_id].concat(
+        TEACHER_DETAIL_COLUMNS.map(function (c) {
+          var v = _teacherDetailValue(t[c.key], c.key);
+          return v === "—" ? "" : v;
+        }),
+      );
+    }),
+  );
+  var bytes = _buildXlsx("Teacher Records", table);
+  var binary = "";
+  for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  var d = new Date();
+  var stamp = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+  downloadFile(
+    btoa(binary),
+    "Teacher_Records_" + stamp + ".xlsx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+}
+
+// Builds a one-sheet .xlsx of text cells (bold, frozen header row and first column) with no
+// library: the portal pages cannot load outside scripts. rows[0] is the header row.
+function _buildXlsx(sheetName, rows) {
+  var esc = function (v) {
+    return String(v === null || v === undefined ? "" : v)
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  };
+  var colName = function (n) {
+    var s = "";
+    for (n += 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+    return s;
+  };
+  var widths = [];
+  rows.forEach(function (r) {
+    r.forEach(function (v, j) {
+      widths[j] = Math.min(60, Math.max(widths[j] || 8, String(v).length + 2));
+    });
+  });
+  var sheetData = rows
+    .map(function (r, i) {
+      return (
+        '<row r="' + (i + 1) + '">' +
+        r
+          .map(function (v, j) {
+            return (
+              '<c r="' + colName(j) + (i + 1) + '" t="inlineStr"' + (i === 0 ? ' s="1"' : "") +
+              '><is><t xml:space="preserve">' + esc(v) + "</t></is></c>"
+            );
+          })
+          .join("") +
+        "</row>"
+      );
+    })
+    .join("");
+  var head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  var rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  var pkgRel = "http://schemas.openxmlformats.org/package/2006/relationships";
+  var ct = "application/vnd.openxmlformats-officedocument.spreadsheetml.";
+  return _zipStore({
+    "[Content_Types].xml":
+      head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="' + ct + 'sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="' + ct + 'worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="' + ct + 'styles+xml"/></Types>',
+    "_rels/.rels":
+      head + '<Relationships xmlns="' + pkgRel + '"><Relationship Id="rId1" Type="' + rel +
+      '/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    "xl/workbook.xml":
+      head + '<workbook xmlns="' + main + '" xmlns:r="' + rel + '"><sheets><sheet name="' +
+      esc(String(sheetName).slice(0, 31)) + '" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    "xl/_rels/workbook.xml.rels":
+      head + '<Relationships xmlns="' + pkgRel + '">' +
+      '<Relationship Id="rId1" Type="' + rel + '/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="' + rel + '/styles" Target="styles.xml"/></Relationships>',
+    "xl/styles.xml":
+      head + '<styleSheet xmlns="' + main + '"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+      '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+    "xl/worksheets/sheet1.xml":
+      head + '<worksheet xmlns="' + main + '"><sheetViews><sheetView workbookViewId="0">' +
+      '<pane xSplit="1" ySplit="1" topLeftCell="B2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths
+        .map(function (w, j) {
+          return '<col min="' + (j + 1) + '" max="' + (j + 1) + '" width="' + w + '" customWidth="1"/>';
+        })
+        .join("") +
+      "</cols><sheetData>" + sheetData + "</sheetData></worksheet>",
+  });
+}
+
+// A zip archive of UTF-8 text files, stored without compression (all an .xlsx needs).
+function _zipStore(files) {
+  var enc = new TextEncoder();
+  var table = [];
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  var crc32 = function (bytes) {
+    var x = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) x = table[(x ^ bytes[i]) & 0xff] ^ (x >>> 8);
+    return (x ^ 0xffffffff) >>> 0;
+  };
+  var u16 = function (v) {
+    return [v & 0xff, (v >>> 8) & 0xff];
+  };
+  var u32 = function (v) {
+    return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
+  };
+  var parts = [];
+  var central = [];
+  var offset = 0;
+  var names = Object.keys(files);
+  names.forEach(function (name) {
+    var nameBytes = enc.encode(name);
+    var data = enc.encode(files[name]);
+    // version 2.0, no flags, stored, 1 Jan 1980, crc, sizes, name length
+    var common = [].concat(u16(20), u16(0), u16(0), u16(0), u16(0x21), u32(crc32(data)),
+      u32(data.length), u32(data.length), u16(nameBytes.length));
+    var local = new Uint8Array([].concat(u32(0x04034b50), common, u16(0)));
+    parts.push(local, nameBytes, data);
+    central.push(
+      new Uint8Array([].concat(u32(0x02014b50), u16(20), common, u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset))),
+      nameBytes,
+    );
+    offset += local.length + nameBytes.length + data.length;
+  });
+  var centralSize = central.reduce(function (s, p) {
+    return s + p.length;
+  }, 0);
+  var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(names.length), u16(names.length),
+    u32(centralSize), u32(offset), u16(0)));
+  var all = parts.concat(central, [end]);
+  var out = new Uint8Array(offset + centralSize + end.length);
+  var pos = 0;
+  all.forEach(function (p) {
+    out.set(p, pos);
+    pos += p.length;
+  });
+  return out;
 }
 
 function _showTeacherDetailsError(message) {
@@ -6781,6 +6993,7 @@ registerPageActions({
   rebuildSbaAssignClassLevel: rebuildSbaAssignClassLevel,
   rebuildSbaAssignSubject: rebuildSbaAssignSubject,
   refreshStudentEnrollment: refreshStudentEnrollment,
+  downloadTeacherDetails: downloadTeacherDetails,
   renderTeacherDetails: renderTeacherDetails,
   saveAdminProfile: saveAdminProfile,
   saveSystemInfo: saveSystemInfo,
