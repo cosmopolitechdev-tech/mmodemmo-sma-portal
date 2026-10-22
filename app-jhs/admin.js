@@ -157,23 +157,23 @@ function buildTeacherDetailsSection(container) {
       tryRender();
     },
   );
-  if (!teachersReady) {
-    callServer("getTeachersForAdmin", {}, ADMIN_TOKEN).then(
-      function (r) {
-        if (_checkAuthCode(r)) return;
-        if (!r || !r.success) {
-          _showTeacherDetailsError((r && r.message) || "Could not load teachers.");
-          return;
-        }
-        TEACHERS_CACHE = r.teachers || [];
-        teachersReady = true;
-        tryRender();
-      },
-      function () {
-        _showTeacherDetailsError("Could not load teachers. Check your connection and retry.");
-      },
-    );
-  }
+  // A list All Teachers already loaded shows at once; it is then refreshed from the server,
+  // so profile changes made since (portal, desktop sync) appear without a reload.
+  callServer("getTeachersForAdmin", {}, ADMIN_TOKEN).then(
+    function (r) {
+      if (_checkAuthCode(r)) return;
+      if (!r || !r.success) {
+        if (!teachersReady) _showTeacherDetailsError((r && r.message) || "Could not load teachers.");
+        return;
+      }
+      TEACHERS_CACHE = r.teachers || [];
+      teachersReady = true;
+      tryRender();
+    },
+    function () {
+      if (!teachersReady) _showTeacherDetailsError("Could not load teachers. Check your connection and retry.");
+    },
+  );
 }
 
 // Staff ID, then the profile fields in the Edit form's order and labels, then any other column.
@@ -198,11 +198,17 @@ function _teacherDetailColumns(fieldConfig, teachers) {
   return cols;
 }
 
+var TEACHER_DETAIL_WORDS = {
+  no: "No.", ntc: "NTC", ssnit: "SSNIT", id: "ID", hpq: "HPQ", haq: "HAQ",
+  qual: "Qualification", prof: "Professional", acad: "Academic", qualif: "Qualification",
+};
+
+// A label for a field the Edit form does not label (e.g. one the school switched off).
 function _prettyFieldName(key) {
   return String(key)
     .split("_")
     .map(function (w) {
-      return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+      return TEACHER_DETAIL_WORDS[w] || (w ? w.charAt(0).toUpperCase() + w.slice(1) : w);
     })
     .join(" ");
 }
@@ -241,7 +247,12 @@ function renderTeacherDetails() {
       rows.length + " of " + TEACHERS_CACHE.length + " teachers · " + TEACHER_DETAIL_COLUMNS.length + " fields";
   }
   if (rows.length === 0) {
-    setHtml(wrapper, '<div class="empty-state"><div class="empty-state__title">No teachers match</div></div>');
+    setHtml(
+      wrapper,
+      '<div class="empty-state"><div class="empty-state__title">' +
+        (TEACHERS_CACHE.length ? "No teachers match your search" : "No teachers yet") +
+        "</div></div>",
+    );
     return;
   }
   var head =
@@ -268,10 +279,13 @@ function renderTeacherDetails() {
       );
     })
     .join("");
+  // A refresh keeps the admin's place in the sideways scroll.
+  var scrollLeft = wrapper.scrollLeft;
   setHtml(
     wrapper,
     '<table class="table table--striped"><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table>",
   );
+  wrapper.scrollLeft = scrollLeft;
 }
 
 function _showTeacherDetailsError(message) {
