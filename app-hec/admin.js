@@ -68,6 +68,7 @@ function showSection(name) {
 
   var sectionBuilders = {
     allTeachers: buildAllTeachersSection,
+    teacherDetails: buildTeacherDetailsSection,
     addTeacher: buildAddTeacherSection,
     shareLinks: buildShareLinksSection,
     exportData: buildExportDataSection,
@@ -95,6 +96,192 @@ function showSection(name) {
       '<div class="empty-state"><div class="empty-state__title">Section not found</div></div>',
     );
   }
+}
+
+// ───────────────────────────────────────────────────────────────────────────── SECTION: TEACHER DETAILS
+// Every teacher as a row and every profile field as a column (read-only), scrolled sideways.
+// ─────────────────────────────────────────────────────────────────────────────
+
+var TEACHER_DETAIL_HIDDEN = ["pin_hash", "pin_salt", "hasPinSet", "_renderError"];
+var TEACHER_DETAIL_LABELS = {
+  staff_id: "Staff ID",
+  school_level: "School Level",
+  account_status: "Account Status",
+  last_login: "Last Login",
+  last_submission_date: "Last Submission",
+};
+var TEACHER_DETAIL_COLUMNS = [];
+
+function buildTeacherDetailsSection(container) {
+  setHtml(
+    container,
+    '<div class="section-header">' +
+      '<div><div class="section-header__title">Teacher Details</div>' +
+      '<div class="section-header__subtitle">Every field of every teacher, one column per field. Scroll sideways to see them all; use All Teachers → Edit to change a record.</div></div>' +
+      "</div>" +
+      '<div class="filter-row">' +
+      searchBoxWithClear(
+        '<input type="text" id="teacherDetailSearch" class="search-box__input" placeholder="Search by name or staff ID…" data-oninput="toggleSearchClear(this);renderTeacherDetails()" />',
+        "teacherDetailSearch",
+        "300px",
+      ) +
+      '<select class="filter-select" id="teacherDetailStatus" data-onchange="renderTeacherDetails()">' +
+      '<option value="">All Statuses</option>' +
+      '<option value="Active">Active</option>' +
+      '<option value="Inactive">Inactive</option>' +
+      '<option value="Locked">Locked</option>' +
+      '<option value="Pending">Pending</option>' +
+      "</select>" +
+      '<span class="text-muted" id="teacherDetailCount" style="font-size:var(--font-size-sm);"></span>' +
+      "</div>" +
+      '<div id="teacherDetailsWrapper" class="table-wrapper">' +
+      '<div class="loading-state"><div class="spinner spinner--sm"></div> Loading teachers…</div>' +
+      "</div>",
+  );
+
+  var fieldConfig = null;
+  var teachersReady = TEACHERS_CACHE.length > 0;
+  function tryRender() {
+    if (fieldConfig === null || !teachersReady) return;
+    TEACHER_DETAIL_COLUMNS = _teacherDetailColumns(fieldConfig, TEACHERS_CACHE);
+    renderTeacherDetails();
+  }
+  callServer("getFieldConfig", {}, "").then(
+    function (r) {
+      fieldConfig = Array.isArray(r) ? r : [];
+      tryRender();
+    },
+    function () {
+      fieldConfig = [];
+      tryRender();
+    },
+  );
+  if (!teachersReady) {
+    callServer("getTeachersForAdmin", {}, ADMIN_TOKEN).then(
+      function (r) {
+        if (_checkAuthCode(r)) return;
+        if (!r || !r.success) {
+          _showTeacherDetailsError((r && r.message) || "Could not load teachers.");
+          return;
+        }
+        TEACHERS_CACHE = r.teachers || [];
+        teachersReady = true;
+        tryRender();
+      },
+      function () {
+        _showTeacherDetailsError("Could not load teachers. Check your connection and retry.");
+      },
+    );
+  }
+}
+
+// Staff ID, then the profile fields in the Edit form's order and labels, then any other column.
+function _teacherDetailColumns(fieldConfig, teachers) {
+  var cols = [{ key: "staff_id", label: "Staff ID" }];
+  var seen = { staff_id: true };
+  TEACHER_DETAIL_HIDDEN.forEach(function (k) {
+    seen[k] = true;
+  });
+  fieldConfig.forEach(function (f) {
+    if (!f || !f.fieldKey || seen[f.fieldKey]) return;
+    seen[f.fieldKey] = true;
+    cols.push({ key: f.fieldKey, label: f.displayLabel || f.fieldKey });
+  });
+  teachers.forEach(function (t) {
+    Object.keys(t || {}).forEach(function (k) {
+      if (seen[k]) return;
+      seen[k] = true;
+      cols.push({ key: k, label: TEACHER_DETAIL_LABELS[k] || _prettyFieldName(k) });
+    });
+  });
+  return cols;
+}
+
+function _prettyFieldName(key) {
+  return String(key)
+    .split("_")
+    .map(function (w) {
+      return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    })
+    .join(" ");
+}
+
+// Dates as DD/MM/YYYY (with the time when there is one); blanks as a dash.
+function _teacherDetailValue(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return "—";
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+  var s = String(value);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (m) {
+    var d = m[3] + "/" + m[2] + "/" + m[1];
+    if (m[4] !== undefined && s.indexOf("T00:00:00") === -1) d += " " + m[4] + ":" + m[5];
+    return d;
+  }
+  return s;
+}
+
+function renderTeacherDetails() {
+  var wrapper = document.getElementById("teacherDetailsWrapper");
+  if (!wrapper) return;
+  var queryEl = document.getElementById("teacherDetailSearch");
+  var statusEl = document.getElementById("teacherDetailStatus");
+  var query = queryEl ? queryEl.value.trim().toLowerCase() : "";
+  var status = statusEl ? statusEl.value : "";
+  var rows = TEACHERS_CACHE.filter(function (t) {
+    if (status && String(t.account_status || "") !== status) return false;
+    if (!query) return true;
+    var name = [t.first_name, t.middle_name, t.surname].join(" ").toLowerCase();
+    return name.indexOf(query) !== -1 || String(t.staff_id || "").toLowerCase().indexOf(query) !== -1;
+  });
+  var countEl = document.getElementById("teacherDetailCount");
+  if (countEl) {
+    countEl.textContent =
+      rows.length + " of " + TEACHERS_CACHE.length + " teachers · " + TEACHER_DETAIL_COLUMNS.length + " fields";
+  }
+  if (rows.length === 0) {
+    setHtml(wrapper, '<div class="empty-state"><div class="empty-state__title">No teachers match</div></div>');
+    return;
+  }
+  var head =
+    '<th class="col-sticky-name">Teacher</th>' +
+    TEACHER_DETAIL_COLUMNS.map(function (c) {
+      return '<th style="white-space:nowrap;">' + sanitizeDisplayValue(c.label) + "</th>";
+    }).join("");
+  var body = rows
+    .map(function (t) {
+      var name = [t.first_name, t.middle_name, t.surname]
+        .filter(function (p) {
+          return p && String(p).trim();
+        })
+        .join(" ");
+      return (
+        "<tr>" +
+        '<td class="col-sticky-name" style="white-space:nowrap;font-weight:600;">' +
+        sanitizeDisplayValue(name || t.staff_id) +
+        "</td>" +
+        TEACHER_DETAIL_COLUMNS.map(function (c) {
+          return '<td style="white-space:nowrap;">' + sanitizeDisplayValue(_teacherDetailValue(t[c.key])) + "</td>";
+        }).join("") +
+        "</tr>"
+      );
+    })
+    .join("");
+  setHtml(
+    wrapper,
+    '<table class="table table--striped"><thead><tr>' + head + "</tr></thead><tbody>" + body + "</tbody></table>",
+  );
+}
+
+function _showTeacherDetailsError(message) {
+  var wrapper = document.getElementById("teacherDetailsWrapper");
+  if (!wrapper) return;
+  setHtml(
+    wrapper,
+    '<div class="empty-state"><div class="empty-state__title">' +
+      sanitizeDisplayValue(message) +
+      '</div><button class="btn btn--outline" data-onclick="showSection(\'teacherDetails\')">Retry</button></div>',
+  );
 }
 
 // ───────────────────────────────────────────────────────────────────────────── SECTION: ALL TEACHERS
@@ -7578,6 +7765,7 @@ registerPageActions({
   rebuildSbaAssignClassLevel: rebuildSbaAssignClassLevel,
   rebuildSbaAssignSubject: rebuildSbaAssignSubject,
   refreshStudentEnrollment: refreshStudentEnrollment,
+  renderTeacherDetails: renderTeacherDetails,
   saveAdminProfile: saveAdminProfile,
   saveSystemInfo: saveSystemInfo,
   setActiveMockNumber: setActiveMockNumber,
