@@ -911,6 +911,79 @@ function _serializeEducation(rows, original, cfg) {
   return JSON.stringify(_sortEducationRows(kept, cfg));
 }
 
+// Education History as the staff-list workbook's own columns, as the desktop shows and exports
+// it (utils/staff_lists.py EDUCATION_COLUMNS; Code.gs _educationColumnValues_ for the PDF).
+var EDUCATION_COLUMNS = (function () {
+  var cols = [
+    ["edu_jhs_name", "JHS Completed: Name"],
+    ["edu_jhs_completed", "JHS: Year Completed"],
+    ["edu_shs_name", "SHS Completed: Name"],
+    ["edu_shs_started", "SHS: Year Started"],
+    ["edu_shs_completed", "SHS: Year Completed"],
+    ["edu_tc_attended", "Attended Training College?"],
+    ["edu_tc_name", "Training College: Name"],
+    ["edu_tc_started", "Training College: Year Started"],
+    ["edu_tc_completed", "Training College: Year Completed"],
+  ];
+  for (var n = 1; n <= 5; n++) {
+    cols.push(
+      ["edu_uni" + n + "_name", "Univ " + n + ": Name"],
+      ["edu_uni" + n + "_started", "Univ " + n + ": Year Started"],
+      ["edu_uni" + n + "_completed", "Univ " + n + ": Year Completed"],
+      ["edu_uni" + n + "_qual_level", "Univ " + n + ": Qual Level"],
+      ["edu_uni" + n + "_qualification", "Univ " + n + ": Qualification"],
+      ["edu_uni" + n + "_other", "If Other: Specify Univ " + n],
+      ["edu_uni" + n + "_type", "Univ " + n + ": Professional or Academic?"],
+    );
+  }
+  return cols.map(function (c) {
+    return { key: c[0], label: c[1] };
+  });
+})();
+
+// {column key: value} for a stored Education History; qualificationLevels maps a listed
+// qualification to its level (an unlisted one is "Other (Specify)" with the text beside it).
+function educationColumns(raw, qualificationLevels) {
+  var levels = qualificationLevels || {};
+  var values = {};
+  EDUCATION_COLUMNS.forEach(function (c) {
+    values[c.key] = "";
+  });
+  var rows = _parseEducationRows(raw).map(function (r) {
+    var row = {};
+    EDUCATION_KEYS.forEach(function (k) {
+      row[k] = String(r[k] || "").trim();
+    });
+    return row;
+  });
+  if (rows.length === 0) return values;
+  var byLevel = {};
+  _sortEducationRows(rows, { levels: ["JHS", "SHS", "Training College", "University / Polytechnic"] })
+    .forEach(function (r) {
+      (byLevel[r.education_level] = byLevel[r.education_level] || []).push(r);
+    });
+  [["JHS", "jhs"], ["SHS", "shs"], ["Training College", "tc"]].forEach(function (p) {
+    var first = (byLevel[p[0]] || [])[0];
+    if (!first) return;
+    values["edu_" + p[1] + "_name"] = first.institution_name;
+    values["edu_" + p[1] + "_completed"] = first.year_completed;
+    if (p[1] !== "jhs") values["edu_" + p[1] + "_started"] = first.year_started;
+  });
+  values.edu_tc_attended = byLevel["Training College"] ? "Yes" : "No";
+  (byLevel["University / Polytechnic"] || []).slice(0, 5).forEach(function (r, i) {
+    var p = "edu_uni" + (i + 1) + "_";
+    var listed = Object.prototype.hasOwnProperty.call(levels, r.qualification);
+    values[p + "name"] = r.institution_name;
+    values[p + "started"] = r.year_started;
+    values[p + "completed"] = r.year_completed;
+    values[p + "qual_level"] = listed ? levels[r.qualification] : "";
+    values[p + "qualification"] = listed ? r.qualification : r.qualification ? "Other (Specify)" : "";
+    values[p + "other"] = listed ? "" : r.qualification;
+    values[p + "type"] = r.qualification_type;
+  });
+  return values;
+}
+
 // Draws one card per school with an "Add a school" button; read-only users see the summary.
 function _renderEducationEditor(group, fc, currentVal, readOnly) {
   var cfg = _educationConfig(fc);
