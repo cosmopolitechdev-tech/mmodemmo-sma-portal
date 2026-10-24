@@ -3248,3 +3248,42 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     -webkit-line-clamp: 3;
   }
 }
+/* Education History editor (profile and Edit Teacher forms): one card per school. */
+.edu-entry {
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  background: var(--bg-card-alt);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+.edu-entry__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  font-weight: 600;
+}
+.edu-entry__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.edu-entry__wide {
+  grid-column: 1 / -1;
+}
+.edu-entry__label {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+.edu-empty {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin: var(--space-2) 0 var(--space-3);
+}
+@media (max-width: 600px) {
+  .edu-entry__grid {
+    grid-template-columns: 1fr;
+  }
+}

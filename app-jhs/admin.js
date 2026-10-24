@@ -225,6 +225,7 @@ function _teacherDetailValue(value, key) {
     var yn = String(value === null || value === undefined ? "" : value).trim().toLowerCase();
     return yn === "1" || yn === "yes" || yn === "true" ? "Yes" : "No";
   }
+  if (key === "education_history") return educationSummary(value) || "—";
   if (value === null || value === undefined || String(value).trim() === "") return "—";
   if (value === true) return "Yes";
   if (value === false) return "No";
@@ -292,7 +293,9 @@ function renderTeacherDetails() {
         sanitizeDisplayValue(name || t.staff_id) +
         "</td>" +
         TEACHER_DETAIL_COLUMNS.map(function (c) {
-          return '<td style="white-space:nowrap;">' + sanitizeDisplayValue(_teacherDetailValue(t[c.key], c.key)) + "</td>";
+          // Education History is a long summary, so it wraps instead of widening the table.
+          var cellStyle = c.key === "education_history" ? "white-space:normal;min-width:340px;" : "white-space:nowrap;";
+          return '<td style="' + cellStyle + '">' + sanitizeDisplayValue(_teacherDetailValue(t[c.key], c.key)) + "</td>";
         }).join("") +
         "</tr>"
       );

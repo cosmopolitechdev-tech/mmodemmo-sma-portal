@@ -564,6 +564,10 @@ function _validateOneField(el, fc) {
   var errors = [];
   var warnings = [];
   if (!el || !fc) return { errors: errors, warnings: warnings };
+  if (fc.fieldType === "education") {
+    errors = _educationProblems(_parseEducationRows(el.value), _educationConfig(fc));
+    return { errors: errors, warnings: warnings };
+  }
 
   var val = el.value ? el.value.trim() : "";
 
@@ -786,6 +790,314 @@ function validateFormValues(containerElement, fieldConfigs) {
   };
 }
 
+// ── Education History editor (Field_Config fieldType "education") ─────────────────────────────
+// The entries live in a hidden input as the same JSON text the desktop stores, so the normal
+// data-field / data-original change check saves them with the rest of the form.
+var EDUCATION_KEYS = [
+  "education_level",
+  "institution_name",
+  "year_started",
+  "year_completed",
+  "qualification",
+  "qualification_type",
+];
+
+// The editor's lists come from Field_Config (Code.gs TEACHER_EDUCATION_CONFIG_).
+function _educationConfig(fc) {
+  var fallback = {
+    levels: ["JHS", "SHS", "Training College", "University / Polytechnic"],
+    limits: { JHS: 1, SHS: 1, "Training College": 1, "University / Polytechnic": 5 },
+    types: ["Professional", "Academic"],
+    qualifications: [],
+  };
+  try {
+    var cfg = JSON.parse(fc && fc.dropdownOptions ? fc.dropdownOptions : "");
+    return cfg && Array.isArray(cfg.levels) ? cfg : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function _parseEducationRows(raw) {
+  var rows;
+  try {
+    rows = JSON.parse(String(raw || ""));
+  } catch (e) {
+    return [];
+  }
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter(function (r) {
+      return r && typeof r === "object";
+    })
+    .map(function (r) {
+      var row = {};
+      EDUCATION_KEYS.forEach(function (k) {
+        row[k] = r[k] === null || r[k] === undefined ? "" : String(r[k]);
+      });
+      return row;
+    });
+}
+
+// One readable line, e.g. "JHS: ASEM JHS (completed 1999); SHS: OPOKU WARE (1999-2002)".
+function educationSummary(raw) {
+  return _parseEducationRows(raw)
+    .map(function (r) {
+      var line = r.education_level + ": " + r.institution_name;
+      if (r.qualification) line += ", " + r.qualification;
+      if (r.year_started && r.year_completed) line += " (" + r.year_started + "-" + r.year_completed + ")";
+      else if (r.year_completed) line += " (completed " + r.year_completed + ")";
+      else if (r.year_started) line += " (from " + r.year_started + ")";
+      return line;
+    })
+    .join("; ");
+}
+
+// What to correct before saving, in plain words.
+function _educationProblems(rows, cfg) {
+  var problems = [];
+  var counts = {};
+  rows.forEach(function (r, i) {
+    var n = "Education History, school " + (i + 1) + ": ";
+    if (!r.education_level) problems.push(n + "choose the Level.");
+    if (!String(r.institution_name || "").trim()) problems.push(n + "type the name of the school.");
+    if (r.year_started && r.year_completed && r.year_started > r.year_completed) {
+      problems.push(n + "Year Started cannot be after Year Completed.");
+    }
+    if (r.education_level) counts[r.education_level] = (counts[r.education_level] || 0) + 1;
+  });
+  cfg.levels.forEach(function (level) {
+    var limit = cfg.limits[level] || 1;
+    if ((counts[level] || 0) > limit) {
+      problems.push(
+        "Education History: only " + limit + " " + level + (limit === 1 ? " entry is" : " entries are") + " allowed.",
+      );
+    }
+  });
+  return problems;
+}
+
+// JHS first, then SHS, Training College, University; each level by year (as the desktop sorts).
+function _sortEducationRows(rows, cfg) {
+  var key = function (r) {
+    var rank = cfg.levels.indexOf(r.education_level);
+    return [rank === -1 ? cfg.levels.length : rank, r.year_started || r.year_completed || ""];
+  };
+  return rows.slice().sort(function (a, b) {
+    var ka = key(a),
+      kb = key(b);
+    if (ka[0] !== kb[0]) return ka[0] - kb[0];
+    return ka[1] < kb[1] ? -1 : ka[1] > kb[1] ? 1 : 0;
+  });
+}
+
+// The text saved for the entries; a blank card is left out, and an emptied list saves "[]".
+function _serializeEducation(rows, original, cfg) {
+  var kept = rows
+    .filter(function (r) {
+      return EDUCATION_KEYS.some(function (k) {
+        return String(r[k] || "").trim();
+      });
+    })
+    .map(function (r) {
+      var o = {};
+      EDUCATION_KEYS.forEach(function (k) {
+        var v = String(r[k] || "").trim();
+        o[k] = k === "institution_name" ? v.toUpperCase() : v;
+      });
+      return o;
+    });
+  if (kept.length === 0) return original === "" ? "" : "[]";
+  return JSON.stringify(_sortEducationRows(kept, cfg));
+}
+
+// Draws one card per school with an "Add a school" button; read-only users see the summary.
+function _renderEducationEditor(group, fc, currentVal, readOnly) {
+  var cfg = _educationConfig(fc);
+  if (readOnly) {
+    var ro = document.createElement("div");
+    ro.className = "field-readonly";
+    ro.id = "field_" + fc.fieldKey;
+    ro.textContent = educationSummary(currentVal) || "—";
+    group.appendChild(ro);
+    return;
+  }
+
+  var hidden = document.createElement("input");
+  hidden.type = "hidden";
+  hidden.id = "field_" + fc.fieldKey;
+  hidden.setAttribute("data-field", fc.fieldKey);
+  hidden.setAttribute("data-original", currentVal);
+  hidden.value = currentVal;
+
+  var rows = _parseEducationRows(currentVal);
+  var years = [];
+  for (var y = new Date().getFullYear(); y >= 1960; y--) years.push(String(y));
+  var listId = "eduQualifications_" + Math.random().toString(36).slice(2);
+  var datalist = document.createElement("datalist");
+  datalist.id = listId;
+  (cfg.qualifications || []).forEach(function (q) {
+    var o = document.createElement("option");
+    o.value = q;
+    datalist.appendChild(o);
+  });
+
+  var list = document.createElement("div");
+  list.className = "edu-list";
+  var empty = document.createElement("p");
+  empty.className = "edu-empty";
+  empty.textContent = 'No school added yet. Click "Add a school" to add one.';
+
+  function save() {
+    hidden.value = _serializeEducation(rows, currentVal, cfg);
+    if (hidden.classList.contains("form-control--error")) _clearFieldError(hidden);
+  }
+
+  function chooser(options, value, blankText, onPick) {
+    var sel = document.createElement("select");
+    sel.className = "form-control";
+    var blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = blankText;
+    sel.appendChild(blank);
+    var all = options.slice();
+    if (value && all.indexOf(value) === -1) all.push(value);
+    all.forEach(function (opt) {
+      var o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      if (opt === value) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", function () {
+      onPick(sel.value);
+    });
+    return sel;
+  }
+
+  function cell(text, control, wide) {
+    var wrap = document.createElement("div");
+    if (wide) wrap.className = "edu-entry__wide";
+    var lab = document.createElement("span");
+    lab.className = "edu-entry__label";
+    lab.textContent = text;
+    wrap.appendChild(lab);
+    wrap.appendChild(control);
+    return wrap;
+  }
+
+  function draw() {
+    list.textContent = "";
+    empty.style.display = rows.length ? "none" : "";
+    rows.forEach(function (r, i) {
+      var card = document.createElement("div");
+      card.className = "edu-entry";
+      var head = document.createElement("div");
+      head.className = "edu-entry__head";
+      var title = document.createElement("span");
+      title.textContent = "School " + (i + 1);
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn--outline btn--sm";
+      remove.textContent = "🗑 Remove";
+      remove.addEventListener("click", function () {
+        rows.splice(i, 1);
+        draw();
+        save();
+      });
+      head.appendChild(title);
+      head.appendChild(remove);
+      card.appendChild(head);
+
+      var grid = document.createElement("div");
+      grid.className = "edu-entry__grid";
+      grid.appendChild(
+        cell(
+          "Level",
+          chooser(cfg.levels, r.education_level, "— Choose level —", function (v) {
+            r.education_level = v;
+            save();
+          }),
+        ),
+      );
+      var name = document.createElement("input");
+      name.type = "text";
+      name.className = "form-control";
+      name.maxLength = 200;
+      name.placeholder = "e.g. Opoku Ware School";
+      name.value = r.institution_name;
+      name.addEventListener("input", function () {
+        r.institution_name = name.value;
+        save();
+      });
+      grid.appendChild(cell("Name of School / Institution", name));
+      grid.appendChild(
+        cell(
+          "Year Started",
+          chooser(years, r.year_started, "— Year —", function (v) {
+            r.year_started = v;
+            save();
+          }),
+        ),
+      );
+      grid.appendChild(
+        cell(
+          "Year Completed",
+          chooser(years, r.year_completed, "— Year —", function (v) {
+            r.year_completed = v;
+            save();
+          }),
+        ),
+      );
+      var qual = document.createElement("input");
+      qual.type = "text";
+      qual.className = "form-control";
+      qual.maxLength = 200;
+      qual.setAttribute("list", listId);
+      qual.placeholder = "Choose from the list or type it";
+      qual.value = r.qualification;
+      qual.addEventListener("input", function () {
+        r.qualification = qual.value;
+        save();
+      });
+      grid.appendChild(cell("Qualification Obtained", qual));
+      grid.appendChild(
+        cell(
+          "Professional or Academic",
+          chooser(cfg.types, r.qualification_type, "— Choose —", function (v) {
+            r.qualification_type = v;
+            save();
+          }),
+        ),
+      );
+      card.appendChild(grid);
+      list.appendChild(card);
+    });
+  }
+
+  var add = document.createElement("button");
+  add.type = "button";
+  add.className = "btn btn--outline-accent btn--sm";
+  add.textContent = "➕ Add a school";
+  add.addEventListener("click", function () {
+    var blank = {};
+    EDUCATION_KEYS.forEach(function (k) {
+      blank[k] = "";
+    });
+    rows.push(blank);
+    draw();
+    var level = list.lastElementChild && list.lastElementChild.querySelector("select");
+    if (level) level.focus();
+  });
+
+  group.appendChild(list);
+  group.appendChild(empty);
+  group.appendChild(add);
+  group.appendChild(datalist);
+  group.appendChild(hidden);
+  draw();
+}
+
 // Renders a form's fields into the DOM and wires up blur/change validation.
 function renderFormFields(containerElement, fieldConfigs, teacherData, isTeacherRole) {
   if (!containerElement) return;
@@ -834,6 +1146,18 @@ function renderFormFields(containerElement, fieldConfigs, teacherData, isTeacher
       teacherData[fc.fieldKey] !== undefined && teacherData[fc.fieldKey] !== null
         ? String(teacherData[fc.fieldKey])
         : "";
+
+    if (fc.fieldType === "education") {
+      if (fc.validationNote) {
+        var eduHint = document.createElement("div");
+        eduHint.className = "form-hint";
+        eduHint.textContent = fc.validationNote;
+        group.appendChild(eduHint);
+      }
+      _renderEducationEditor(group, fc, currentVal, isTeacherRole && !fc.editableByTeacher);
+      containerElement.appendChild(group);
+      return;
+    }
 
     if (
       fc.fieldKey === "first_name" ||
@@ -896,13 +1220,21 @@ function renderFormFields(containerElement, fieldConfigs, teacherData, isTeacher
             if (opt === currentVal) o.selected = true;
             input.appendChild(o);
           });
+          // A saved value missing from the list stays selectable, so saving does not blank it.
+          if (currentVal !== "" && opts.indexOf(currentVal) === -1) {
+            var keepOpt = document.createElement("option");
+            keepOpt.value = currentVal;
+            keepOpt.textContent = currentVal;
+            keepOpt.selected = true;
+            input.appendChild(keepOpt);
+          }
         }
 
         if (currentVal === "") {
           var _CONSTRAINED_DEFAULTS = {
             disability: "No",
             staff_category: "Professional",
-            staff_status: "Teaching Staff",
+            staff_status: "Teaching",
             is_form_teacher: "No",
             is_head_teacher: "No",
             is_assistant_head: "No",
