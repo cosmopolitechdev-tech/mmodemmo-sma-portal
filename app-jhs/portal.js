@@ -199,8 +199,8 @@ function friendlyErrorFrontend(msg) {
     return "Network error. Please check your internet connection and try again.";
   }
 
-  if (m.indexOf("timed out") !== -1 || m.indexOf("lock") !== -1) {
-    return "Another user is saving at the same time. Please wait a moment and try again.";
+  if (m.indexOf("timed out") !== -1 || m.indexOf("lock timeout") !== -1) {
+    return "The portal is busy saving other work, such as a sync from the school computer. Please wait a moment and try again.";
   }
   if (m.indexOf("quota") !== -1) {
     return "The system is busy. Please try again in a minute.";
