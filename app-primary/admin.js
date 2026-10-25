@@ -188,6 +188,14 @@ function _teacherDetailColumns(fieldConfig, teachers) {
   fieldConfig.forEach(function (f) {
     if (!f || !f.fieldKey || seen[f.fieldKey]) return;
     seen[f.fieldKey] = true;
+    if (f.fieldKey === "education_history") {
+      // The staff-list workbook's columns instead of one long cell (also in the downloads).
+      TEACHER_EDU_LEVELS = _educationConfig(f).qualificationLevels || {};
+      EDUCATION_COLUMNS.forEach(function (c) {
+        cols.push({ key: c.key, label: c.label });
+      });
+      return;
+    }
     cols.push({ key: f.fieldKey, label: f.displayLabel || f.fieldKey });
   });
   teachers.forEach(function (t) {
@@ -218,12 +226,22 @@ function _prettyFieldName(key) {
 // Stored as 1/0; shown as Yes/No.
 var TEACHER_DETAIL_YES_NO = ["is_form_teacher", "is_head_teacher", "is_assistant_head"];
 
+// Qualification levels for the Education History columns (from its Field_Config lists).
+var TEACHER_EDU_LEVELS = {};
+
+// A teacher's value for a Teacher Details column; the edu_* columns come from education_history.
+function _teacherDetailRaw(t, key) {
+  if (String(key).indexOf("edu_") !== 0) return t[key];
+  return educationColumns(t.education_history, TEACHER_EDU_LEVELS)[key];
+}
+
 // Dates as DD/MM/YYYY (with the time when there is one); Yes/No fields as Yes/No; blanks as a dash.
 function _teacherDetailValue(value, key) {
   if (TEACHER_DETAIL_YES_NO.indexOf(key) !== -1) {
     var yn = String(value === null || value === undefined ? "" : value).trim().toLowerCase();
     return yn === "1" || yn === "yes" || yn === "true" ? "Yes" : "No";
   }
+  if (key === "education_history") return educationSummary(value) || "—";
   if (value === null || value === undefined || String(value).trim() === "") return "—";
   if (value === true) return "Yes";
   if (value === false) return "No";
@@ -291,7 +309,7 @@ function renderTeacherDetails() {
         sanitizeDisplayValue(name || t.staff_id) +
         "</td>" +
         TEACHER_DETAIL_COLUMNS.map(function (c) {
-          return '<td style="white-space:nowrap;">' + sanitizeDisplayValue(_teacherDetailValue(t[c.key], c.key)) + "</td>";
+          return '<td style="white-space:nowrap;">' + sanitizeDisplayValue(_teacherDetailValue(_teacherDetailRaw(t, c.key), c.key)) + "</td>";
         }).join("") +
         "</tr>"
       );
@@ -346,7 +364,7 @@ function downloadTeacherDetails() {
     rows.map(function (t) {
       return [_teacherDetailName(t) || t.staff_id].concat(
         TEACHER_DETAIL_COLUMNS.map(function (c) {
-          var v = _teacherDetailValue(t[c.key], c.key);
+          var v = _teacherDetailValue(_teacherDetailRaw(t, c.key), c.key);
           return v === "—" ? "" : v;
         }),
       );
