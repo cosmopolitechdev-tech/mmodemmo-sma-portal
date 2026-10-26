@@ -176,6 +176,20 @@ function showToast(message, type) {
     document.body.appendChild(container);
   }
   var iconMap = { success: "✅", error: "❌", warning: "⚠️", info: "ℹ️" };
+  // A repeated message keeps its one toast (timer restarted); stacking copies made the older
+  // toasts jump up and down as each new one arrived and left.
+  var key = type + "|" + String(message);
+  var shown = container.querySelectorAll(".toast");
+  for (var i = 0; i < shown.length; i++) {
+    if (shown[i]._toastKey === key) {
+      clearTimeout(shown[i]._toastTimer);
+      var same = shown[i];
+      same._toastTimer = setTimeout(function () {
+        if (same.parentElement) same.remove();
+      }, 5500);
+      return;
+    }
+  }
   var close = el("button", { className: "toast__close", type: "button" }, ["✕"]);
   var toast = el("div", { className: "toast toast--" + type }, [
     el("span", { className: "toast__icon" }, [iconMap[type] || "ℹ️"]),
@@ -185,8 +199,9 @@ function showToast(message, type) {
   close.addEventListener("click", function () {
     toast.remove();
   });
+  toast._toastKey = key;
   container.appendChild(toast);
-  setTimeout(function () {
+  toast._toastTimer = setTimeout(function () {
     if (toast.parentElement) toast.remove();
   }, 5500);
 }
@@ -251,38 +266,51 @@ function closeModal(onClosed) {
   }
 }
 
-function copyTextToClipboard(text, successMsg, failMsgPrefix) {
+// Lets a caller show its own "copied" cue (e.g. on the button) instead of a toast.
+function _announceCopied_(successMsg, onCopied) {
+  if (typeof onCopied === "function") onCopied();
+  else showToast(successMsg, "success");
+}
+
+// Copies text to the clipboard, showing a toast (or onCopied) on success, a toast on failure.
+function copyTextToClipboard(text, successMsg, failMsgPrefix, onCopied) {
   successMsg = successMsg || "Copied to clipboard.";
   failMsgPrefix = failMsgPrefix || "Could not copy automatically. Value: ";
   if (!text) return;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(
       function () {
-        showToast(successMsg, "success");
+        _announceCopied_(successMsg, onCopied);
       },
       function () {
-        fallbackCopyToClipboard_(text, successMsg, failMsgPrefix);
+        fallbackCopyToClipboard_(text, successMsg, failMsgPrefix, onCopied);
       },
     );
   } else {
-    fallbackCopyToClipboard_(text, successMsg, failMsgPrefix);
+    fallbackCopyToClipboard_(text, successMsg, failMsgPrefix, onCopied);
   }
 }
 
-function fallbackCopyToClipboard_(text, successMsg, failMsgPrefix) {
+function fallbackCopyToClipboard_(text, successMsg, failMsgPrefix, onCopied) {
   var ta = el("textarea", { value: text });
-  ta.style.position = "fixed";
-  ta.style.opacity = "0";
+  // Pinned on screen and read-only: focusing it must not scroll the page or pop up a phone
+  // keyboard, which made the open dialog jump while copying.
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;";
+  var previousFocus = document.activeElement;
   document.body.appendChild(ta);
+  ta.focus({ preventScroll: true });
   ta.select();
+  ta.setSelectionRange(0, text.length);
   try {
     document.execCommand("copy");
-    showToast(successMsg, "success");
+    _announceCopied_(successMsg, onCopied);
   } catch (e) {
     console.warn("copy failed", e);
     showToast(failMsgPrefix + text, "warning");
   }
   document.body.removeChild(ta);
+  if (previousFocus && previousFocus.focus) previousFocus.focus({ preventScroll: true });
 }
 
 /* Replaces the emoji placeholder with the school's logo; built as an element, never HTML text. */

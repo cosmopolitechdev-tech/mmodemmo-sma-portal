@@ -2615,26 +2615,60 @@ function buildMockTabContent() {
   document.getElementById("mockClassLevel").addEventListener("change", rebuildMockSubjectDropdown);
 }
 
-// Runs setup when the Mock Exams tab is activated. Always
-// refetches getAttendanceConfig() (rather than only when uncached)
-// so ATT_CONFIG.currentMockNumber reflects an Admin-Portal mock
-// number change without requiring a re-login.
+// Runs setup when the Mock Exams tab is activated. Opens at once from the
+// config loaded at sign-in (like SBA Marks), then re-checks the server
+// quietly so an Admin-Portal mock number change still shows up.
 function onMockTabActivated() {
-  showSpinner();
+  if (!ATT_CONFIG.academicYear) {
+    showSpinner();
+    callServer("getAttendanceConfig", {}, SESSION.token).then(
+      function (cfg) {
+        hideSpinner();
+        if (!cfg || !cfg.success) {
+          if (_handleSessionCodes(cfg)) return;
+          showToast("Could not load Mock Exams configuration.", "error");
+          return;
+        }
+        ATT_CONFIG = cfg;
+        _loadSbaSubjectsReferenceThen(_initMockTab);
+      },
+      function () {
+        hideSpinner();
+        showToast("Server error loading Mock Exams configuration.", "error");
+      },
+    );
+    return;
+  }
+  _loadSbaSubjectsReferenceThen(_initMockTab);
+  _refreshMockNumberQuietly();
+}
+
+// Background check for a new active mock number; only a change touches the screen.
+var _mockConfigCheckSeq = 0;
+function _refreshMockNumberQuietly() {
+  var seq = ++_mockConfigCheckSeq;
   callServer("getAttendanceConfig", {}, SESSION.token).then(
     function (cfg) {
-      hideSpinner();
+      if (seq !== _mockConfigCheckSeq) return;
       if (!cfg || !cfg.success) {
-        if (_handleSessionCodes(cfg)) return;
-        showToast("Could not load Mock Exams configuration.", "error");
+        _handleSessionCodes(cfg);
         return;
       }
+      var changed = (cfg.currentMockNumber || "") !== (CURRENT_MOCK_NUMBER || "");
       ATT_CONFIG = cfg;
-      _loadSbaSubjectsReferenceThen(_initMockTab);
+      if (!changed) return;
+      _initMockTab();
+      if (cfg.currentMockNumber) {
+        showToast(
+          "The administrator changed the active mock to " +
+            cfg.currentMockNumber +
+            ". Please load your class again.",
+          "info",
+        );
+      }
     },
     function () {
-      hideSpinner();
-      showToast("Server error loading Mock Exams configuration.", "error");
+      // The tab already works from the sign-in config; the next visit checks again.
     },
   );
 }

@@ -1338,8 +1338,18 @@ function _executeResetPIN(staffId) {
           {
             label: "📋 Copy PIN",
             cls: "btn--outline",
-            action: function () {
-              copyTextToClipboard(newPin, "PIN copied.", "Could not copy automatically. PIN: ");
+            action: function (ev) {
+              // The button itself says "copied": a toast would sit over these buttons on a phone.
+              var btn = ev && ev.currentTarget;
+              copyTextToClipboard(newPin, "PIN copied.", "Could not copy automatically. PIN: ", function () {
+                if (!btn) return showToast("PIN copied.", "success");
+                btn.style.minWidth = btn.offsetWidth + "px";
+                btn.textContent = "✅ PIN copied";
+                clearTimeout(btn._copiedTimer);
+                btn._copiedTimer = setTimeout(function () {
+                  btn.textContent = "📋 Copy PIN";
+                }, 2000);
+              });
             },
           },
           {
