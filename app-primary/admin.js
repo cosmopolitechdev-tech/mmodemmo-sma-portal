@@ -731,6 +731,71 @@ function _applyTeachersToUI(teachers) {
   filterAndRenderTeachers();
 }
 
+// The newest release is read from GitHub, so a new release needs no portal change.
+var DESKTOP_RELEASES_API =
+  "https://api.github.com/repos/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest";
+var DESKTOP_RELEASE_PAGE_PREFIX =
+  "https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/";
+var DESKTOP_UPDATE_CHECKED = false;
+
+/* Compares "1.3.2"-style versions: negative, zero or positive like a sort comparator. */
+function _compareDesktopVersions(a, b) {
+  var pa = String(a).replace(/^v/i, "").split(".");
+  var pb = String(b).replace(/^v/i, "").split(".");
+  for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+    var diff = (parseInt(pa[i], 10) || 0) - (parseInt(pb[i], 10) || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/* Shows the update banner once per page load when the school's desktop is older than the latest release. */
+function _checkDesktopUpdate(desktopVersion) {
+  if (DESKTOP_UPDATE_CHECKED || !desktopVersion) return;
+  DESKTOP_UPDATE_CHECKED = true;
+  fetch(DESKTOP_RELEASES_API)
+    .then(function (resp) {
+      return resp.ok ? resp.json() : null;
+    })
+    .then(function (release) {
+      if (!release || !release.tag_name || !release.html_url) return;
+      if (String(release.html_url).indexOf(DESKTOP_RELEASE_PAGE_PREFIX) !== 0) return;
+      if (_compareDesktopVersions(release.tag_name, desktopVersion) <= 0) return;
+      _showDesktopUpdateBanner(String(release.tag_name).replace(/^v/i, ""), release.html_url);
+    })
+    .catch(function (err) {
+      console.warn("Desktop update check failed:", err);
+    });
+}
+
+function _showDesktopUpdateBanner(version, url) {
+  var main = document.getElementById("mainContent");
+  if (!main || document.getElementById("desktopUpdateBanner")) return;
+  var bar = document.createElement("div");
+  bar.id = "desktopUpdateBanner";
+  bar.className = "desktop-update-banner";
+  bar.setAttribute("role", "status");
+  var text = document.createElement("span");
+  text.textContent = "A new desktop version (" + version + ") is available – ";
+  var link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Download";
+  text.appendChild(link);
+  var close = document.createElement("button");
+  close.type = "button";
+  close.className = "desktop-update-banner__close";
+  close.setAttribute("aria-label", "Hide this message");
+  close.textContent = "×";
+  close.addEventListener("click", function () {
+    bar.parentNode.removeChild(bar);
+  });
+  bar.appendChild(text);
+  bar.appendChild(close);
+  main.insertBefore(bar, main.firstChild);
+}
+
 // Fire the status-counts and sync-status calls independently.
 // Each renders (or shows an error) as soon as it resolves.
 function _loadSecondaryPanels() {
@@ -757,6 +822,7 @@ function _loadSecondaryPanels() {
         // populate the Academic Year/Term/Week Number row from this same getSyncStatus() round-trip —
         // no extra network call needed.
         _renderAllTeachersWeekInfo(r);
+        _checkDesktopUpdate(r.desktopVersion);
       } else {
         _renderSyncCardError();
         _renderAllTeachersWeekInfoError();
