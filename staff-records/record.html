@@ -258,9 +258,11 @@
           <h2 style="font-size:18px">Reminder message</h2>
           <div class="field"><label for="set-REMINDER_MESSAGE">WhatsApp reminder <span class="hint">— {first_name}, {percent}, {missing}, {link} are filled in</span></label>
             <textarea id="set-REMINDER_MESSAGE" maxlength="500"></textarea><div class="err" id="e-set-REMINDER_MESSAGE"></div></div>
-          <h2 style="font-size:18px">Roll-out waves</h2>
-          <p class="hint">Tick the circuits that may sign in now. Tick none to open the portal to everyone.</p>
-          <div id="set-waves"></div><div class="err" id="e-set-ALLOWED_CIRCUITS"></div>
+          <div id="waves-section">
+            <h2 style="font-size:18px">Roll-out waves</h2>
+            <p class="hint">Tick the circuits that may sign in now. Tick none to open the portal to everyone.</p>
+            <div id="set-waves"></div><div class="err" id="e-set-ALLOWED_CIRCUITS"></div>
+          </div>
           <h2 style="font-size:18px">Maintenance</h2>
           <label class="check"><input type="checkbox" id="set-MAINTENANCE_MODE" /> Close the portal for teachers and coordinators (admins can still work)</label>
           <div class="field"><label for="set-MAINTENANCE_MESSAGE">Message they see</label><input type="text" id="set-MAINTENANCE_MESSAGE" maxlength="300" /><div class="err" id="e-set-MAINTENANCE_MESSAGE"></div></div>
@@ -348,7 +350,7 @@
           <div class="field"><label for="one-surname">Surname</label><input type="text" id="one-surname" maxlength="60" autocomplete="off" autocapitalize="characters" /><div class="err" id="e-one-surname" role="alert"></div></div>
           <div class="field"><label for="one-first_name">First name</label><input type="text" id="one-first_name" maxlength="60" autocomplete="off" autocapitalize="characters" /><div class="err" id="e-one-first_name" role="alert"></div></div>
           <div class="field"><label for="one-other_middle_names">Other names <span class="hint">— if any</span></label><input type="text" id="one-other_middle_names" maxlength="60" autocomplete="off" autocapitalize="characters" /><div class="err" id="e-one-other_middle_names" role="alert"></div></div>
-          <div class="field"><label for="one-school_emis_code">School <span class="hint">— or leave it: the teacher chooses at first sign-in</span></label><select id="one-school_emis_code"></select></div>
+          <div class="field" id="one-school-field"><label for="one-school_emis_code">School <span class="hint">— or leave it: the teacher chooses at first sign-in</span></label><select id="one-school_emis_code"></select></div>
           <div class="field"><label for="one-phone_number">Phone <span class="hint">— optional</span></label><input type="tel" id="one-phone_number" inputmode="tel" maxlength="16" autocomplete="off" /><div class="err" id="e-one-phone_number" role="alert"></div></div>
           <div class="err" id="e-one" role="alert"></div>
           <button type="button" class="btn" id="one-add">Add this teacher</button>
@@ -449,6 +451,7 @@
           <ul class="counts" id="school-counts"></ul>
           <p style="margin:12px 0 0"><button type="button" class="btn secondary" id="group-msg">Copy group message for WhatsApp</button></p>
           <textarea class="msgbox hidden" id="group-text" readonly aria-label="Group message"></textarea>
+          <div class="more" id="school-export"></div>
         </div>
         <div class="toolbar">
           <label class="check"><input type="checkbox" id="only-incomplete" /> Only those not finished</label>

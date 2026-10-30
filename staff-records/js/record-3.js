@@ -611,8 +611,8 @@ var $ = function (id) { return document.getElementById(id); };
         $("tab-import").setAttribute("aria-selected", String(view === "import"));
         $("tab-teachers").setAttribute("aria-selected", String(view === "teachers"));
         $("tab-circuit").setAttribute("aria-selected", String(view === "circuit" && S.circuitRole));
-        $("tab-overview").setAttribute("aria-selected", String(view === "overview"));
-        $("back-circuit-row").classList.toggle("hidden", !((S.circuitRole || S.admin) && view === "school"));
+        $("tab-overview").setAttribute("aria-selected", String(view === "overview" || (!!S.schoolMode && view === "school")));
+        $("back-circuit-row").classList.toggle("hidden", !((S.circuitRole || S.admin) && view === "school" && !S.schoolMode));
         $("back-circuit").textContent = S.circuitRole || S.circuitName ? "← Back to the circuit" : "← Back to the overview";
         $("back-overview-row").classList.toggle("hidden", !(S.admin && view === "circuit"));
         $("record-view").classList.toggle("hidden", view !== "record");
@@ -620,7 +620,7 @@ var $ = function (id) { return document.getElementById(id); };
         $("tab-school").setAttribute("aria-selected", String(view === "school" && !S.circuitRole));
         $("tab-record").setAttribute("aria-selected", String(view === "record" && !S.subject));
         $("top-title").textContent = view === "audit" ? "Audit log" : view === "settings" ? "Settings" : view === "admins" ? "Admins" : view === "import" ? "Import teachers" : view === "teachers" ? "Teachers" : view === "overview" ? "Overview" : view === "setup" ? "Set up your school" : view === "circuit" ? (S.admin ? "Circuit" : "My Circuit")
-          : view === "school" ? (S.circuitRole || S.admin ? "School" : "My School")
+          : view === "school" ? ((S.circuitRole || S.admin) && !S.schoolMode ? "School" : "My School")
           : S.subject ? "Colleague's record" : "My staff record";
         window.scrollTo(0, 0);
       }
@@ -683,6 +683,12 @@ var $ = function (id) { return document.getElementById(id); };
         while (ul.firstChild) ul.removeChild(ul.firstChild);
         [["Complete", c.complete], ["Needs confirming", c.needsConfirming], ["Partial", c.partial], ["Not started", c.notStarted], ["Not at post", c.notActive]]
           .forEach(function (x) { if (x[1]) ul.appendChild(el("li", {}, x[0] + ": " + x[1])); });
+        var sx = $("school-export");
+        while (sx.firstChild) sx.removeChild(sx.firstChild);
+        if (S.schoolMode && canExport()) {
+          sx.appendChild(exportButton("Download the school's staff list", { kind: "school", emis: r.school.emis }));
+          sx.appendChild(exportButton("Staff list (CSV)", { kind: "school", emis: r.school.emis }, true));
+        }
         renderList();
       }
 
@@ -1135,13 +1141,22 @@ var $ = function (id) { return document.getElementById(id); };
           $("tab-settings").classList.toggle("hidden", !r.can["settings"]);
           $("tab-audit").classList.toggle("hidden", !r.can["audit.view"]);
           $("schools-add").classList.toggle("hidden", !r.can["schools.manage"]);
+          if (r.school) {
+            // One school (SPEC § 15): its own screen is the home, with the coordinators' tools for the admin.
+            S.schoolMode = true;
+            S.schoolEmis = r.school;
+            $("tab-overview").textContent = "My School";
+            showWho((r.district.name || "School") + (r.main ? " · Main Admin" : " · Admin"), r.termLabel);
+            loadSchool();
+            return;
+          }
           renderOverview();
         }, fail);
       }
 
       function renderOverview() {
         var r = S.overview, c = r.counts;
-        showWho((r.district.mmda || "District") + (r.main ? " · Main Admin" : " · Admin"), r.termLabel);
+        showWho((r.district.name || r.district.mmda || "District") + (r.main ? " · Main Admin" : " · Admin"), r.termLabel);
         $("district-name").textContent = r.district.mmda || "District";
         $("district-pct").textContent = r.pct + "%";
         $("district-bar").style.width = r.pct + "%";
@@ -1339,7 +1354,7 @@ var $ = function (id) { return document.getElementById(id); };
           });
           li.appendChild(sel);
         }
-        if (can["teachers.import"]) {
+        if (can["teachers.import"] && !S.schoolMode) {
           var more = el("div", { "class": "more" });
           var move = el("button", { type: "button", "class": "sbtn" }, "Transfer to another school…");
           move.addEventListener("click", function () { transferForm(t, li); });
@@ -1397,6 +1412,7 @@ var $ = function (id) { return document.getElementById(id); };
         showView("import");
         callServer_("getImportOptions", [S.token], function (r) {
           if (!r || !r.ok) { fail(r); return; }
+          $("one-school-field").classList.toggle("hidden", !!r.schoolMode);
           fillOptions($("one-school_emis_code"), [], "", "— not known yet —");
           r.schools.forEach(function (x) { $("one-school_emis_code").appendChild(el("option", { value: x.emis }, x.name + " (" + x.circuit + ")")); });
         }, fail);
@@ -1753,6 +1769,7 @@ var $ = function (id) { return document.getElementById(id); };
         callServer_("getSettings", [S.token], function (r) {
           if (!r || !r.ok) { fail(r); return; }
           S.settings = r;
+          $("waves-section").classList.toggle("hidden", !!S.schoolMode);
           renderSettings();
         }, fail);
       }

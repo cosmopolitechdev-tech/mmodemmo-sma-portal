@@ -131,7 +131,7 @@ var $ = function (id) { return document.getElementById(id); };
           o.value = name; o.textContent = name;
           sel.appendChild(o);
         });
-        if (c.mode === "school") $("tab-coordinator").textContent = "ICT Coordinator";
+        $("tab-coordinator").classList.toggle("hidden", c.mode === "school"); // one school: admins and teachers only
         selectTab("teacher");
       }
 
