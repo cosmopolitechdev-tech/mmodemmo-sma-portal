@@ -1,0 +1,1 @@
+var PORTAL_URL = "./";

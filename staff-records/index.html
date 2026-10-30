@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <style>
+  /* Shared look: maroon on cream like _sba_project's portal. Phone first (SPEC § 16): system
+     fonts, 16 px inputs (no iPhone zoom), 44 px tap targets, one column below 600 px. */
+  :root {
+    --primary: #6e1728;
+    --primary-2: #ac2840;
+    --accent: #8e1e35;
+    --bg-page: #fbf6ee;
+    --bg-card: #ffffff;
+    --text: #1f2933;
+    --text-muted: #52606d;
+    --border: #e4d9c8;
+    --error: #b42318;
+    --error-bg: #fde8e8;
+    --ok: #05603a;
+    --ok-bg: #e3f9e5;
+    --warn-bg: #fff4e5;
+    --warn: #7a4a00;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg-page);
+  }
+  .hidden { display: none !important; }
+  .wrap { max-width: 440px; margin: 0 auto; padding: 16px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: 0 6px 24px rgba(110, 23, 40, .08); }
+  .card-head { background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #fff; text-align: center; padding: 24px 16px 18px; }
+  .card-head h1 { margin: 0; font-size: 22px; line-height: 1.25; }
+  .card-head p { margin: 4px 0 0; color: rgba(255, 255, 255, .92); font-size: 14px; }
+  .card-body { padding: 16px; }
+  .tabs { display: flex; border-bottom: 2px solid var(--border); margin: -4px 0 14px; }
+  .tab { flex: 1; min-height: 44px; border: 0; background: none; font: inherit; font-size: 15px; font-weight: 600; color: var(--text-muted); border-bottom: 3px solid transparent; margin-bottom: -2px; cursor: pointer; padding: 6px 4px; }
+  .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .hint { font-weight: 400; color: var(--text-muted); font-size: 14px; }
+  input[type=text], input[type=password], input[type=tel], input[type=email], select, textarea {
+    width: 100%; min-height: 44px; font: inherit; font-size: 16px; padding: 8px 12px;
+    border: 1px solid #9aa5b1; border-radius: 8px; background: #fff; color: var(--text);
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; min-height: 44px; padding-top: 10px; }
+  .check input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
+  .err { color: var(--error); font-size: 14px; margin-top: 4px; }
+  .err:empty { display: none; }
+  fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px 12px; margin: 0 0 16px; min-width: 0; }
+  legend { font-weight: 700; padding: 0 6px; }
+  input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px solid rgba(142, 30, 53, .35); outline-offset: 1px; }
+  .pw { position: relative; }
+  .pw input { padding-right: 64px; }
+  .pw button { position: absolute; right: 2px; top: 0; bottom: 0; min-width: 60px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .choices { display: flex; gap: 16px; margin-bottom: 12px; }
+  .choices label { font-weight: 500; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+  .btn { display: block; width: 100%; min-height: 48px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+  a.btn { text-align: center; line-height: 48px; text-decoration: none; }
+  .btn[disabled] { opacity: .65; cursor: progress; }
+  .btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  .alert { border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 15px; }
+  .alert.error { background: var(--error-bg); color: var(--error); border-left: 4px solid var(--error); }
+  .alert.ok { background: var(--ok-bg); color: var(--ok); }
+  .alert.warn { background: var(--warn-bg); color: var(--warn); border-left: 4px solid #f0a020; }
+  .btn.danger { background: var(--error); }
+  /* Fold-out headings are tapped like buttons: as tall as one. */
+  summary { padding: 10px 0; cursor: pointer; }
+  /* The confirmation dialog (confirmBox_ in JavaScript.html). */
+  body.dlg-open { overflow: hidden; }
+  .dlg-back { position: fixed; inset: 0; z-index: 1000; background: rgba(31, 41, 51, .55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .dlg { background: var(--bg-card); border-radius: 12px; width: 100%; max-width: 420px; max-height: calc(100vh - 32px); overflow: auto;
+    border-top: 6px solid var(--accent); box-shadow: 0 18px 48px rgba(0, 0, 0, .3); padding: 18px 18px 16px; }
+  .dlg.danger { border-top-color: var(--error); }
+  .dlg h2 { margin: 0 0 8px; font-size: 19px; line-height: 1.3; color: var(--primary); }
+  .dlg.danger h2 { color: var(--error); }
+  .dlg-message { margin: 0 0 8px; font-size: 16px; }
+  .dlg-detail { margin: 0 0 4px; font-size: 14px; color: var(--text-muted); }
+  .dlg-buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .dlg-buttons .btn { flex: 1 1 150px; width: auto; padding: 0 14px; }
+  .foot { text-align: center; color: var(--text-muted); font-size: 13px; margin: 16px 0; }
+  .link { border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; min-height: 44px; }
+  .key { font: 600 17px/1.5 ui-monospace, Consolas, monospace; text-align: center; background: #f4efe6; border-radius: 8px; padding: 12px 8px; overflow-wrap: normal; word-break: keep-all; user-select: all; }
+  @media (min-width: 600px) {
+    .wrap { padding: 40px 16px; }
+    .card-body { padding: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="card-head">
+          <h1 id="title">Staff Records Portal</h1>
+          <p id="subtitle">Sign in to keep your staff record up to date</p>
+        </div>
+        <div class="card-body">
+          <div id="maintenance" class="alert warn hidden" role="status"></div>
+          <div id="waves" class="alert warn hidden" role="status"></div>
+
+          <section id="signin">
+            <div class="tabs" role="tablist" aria-label="Sign in as">
+              <button type="button" class="tab" role="tab" id="tab-teacher" aria-controls="panel-teacher" aria-selected="true">Teacher</button>
+              <button type="button" class="tab" role="tab" id="tab-coordinator" aria-controls="panel-coordinator" aria-selected="false">ICT Coordinator</button>
+              <button type="button" class="tab" role="tab" id="tab-admin" aria-controls="panel-admin" aria-selected="false">Admin</button>
+            </div>
+            <div id="message" class="hidden" role="alert"></div>
+
+            <form id="panel-teacher" role="tabpanel" aria-labelledby="tab-teacher" novalidate>
+              <div class="field">
+                <label for="t-staff">Staff ID</label>
+                <input type="text" id="t-staff" inputmode="numeric" autocomplete="username" maxlength="15" required />
+              </div>
+              <div class="field">
+                <label for="t-pass">Password</label>
+                <div class="pw"><input type="password" id="t-pass" autocomplete="current-password" maxlength="128" required /><button type="button" class="show-pw" aria-controls="t-pass">Show</button></div>
+              </div>
+              <button type="submit" class="btn">Sign in</button>
+            </form>
+
+            <form id="panel-coordinator" class="hidden" role="tabpanel" aria-labelledby="tab-coordinator" novalidate>
+              <div class="choices" role="radiogroup" aria-label="Coordinator for">
+                <label><input type="radio" name="c-kind" value="school" checked /> My school</label>
+                <label><input type="radio" name="c-kind" value="circuit" /> My circuit</label>
+              </div>
+              <div class="field hidden" id="c-circuit-field">
+                <label for="c-circuit">Circuit</label>
+                <select id="c-circuit"></select>
+              </div>
+              <div class="field">
+                <label for="c-staff">Your Staff ID</label>
+                <input type="text" id="c-staff" inputmode="numeric" autocomplete="username" maxlength="15" />
+              </div>
+              <div class="field">
+                <label for="c-pass">Password <span class="hint">— the same as your teacher password</span></label>
+                <div class="pw"><input type="password" id="c-pass" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="c-pass">Show</button></div>
+              </div>
+              <button type="submit" class="btn">Sign in</button>
+            </form>
+
+            <form id="panel-admin" class="hidden" role="tabpanel" aria-labelledby="tab-admin" novalidate>
+              <div class="field">
+                <label for="a-user">Username</label>
+                <input type="text" id="a-user" autocomplete="username" autocapitalize="none" maxlength="40" />
+              </div>
+              <div class="field">
+                <label for="a-pass">Password</label>
+                <div class="pw"><input type="password" id="a-pass" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="a-pass">Show</button></div>
+              </div>
+              <button type="submit" class="btn">Sign in</button>
+              <p class="foot"><button type="button" class="link" id="forgot">Forgot your password? Use your recovery key</button></p>
+              <p class="foot" style="margin-top:4px"><button type="button" class="link" id="have-code">I have a handover code</button></p>
+            </form>
+          </section>
+
+          <form id="recover" class="hidden" novalidate>
+            <div class="alert warn">Main Admin only: use the recovery key you wrote down when you first signed in.</div>
+            <div id="recover-message" class="hidden" role="alert"></div>
+            <div class="field"><label for="r-user">Username</label><input type="text" id="r-user" autocapitalize="none" maxlength="40" /></div>
+            <div class="field"><label for="r-key">Recovery key</label><input type="text" id="r-key" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
+            <div class="field"><label for="r-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
+              <div class="pw"><input type="password" id="r-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="r-new">Show</button></div></div>
+            <div class="field"><label for="r-again">New password again</label><input type="password" id="r-again" autocomplete="new-password" maxlength="128" /></div>
+            <button type="submit" class="btn">Set my new password</button>
+            <p class="foot"><button type="button" class="link" id="recover-back">Back to sign in</button></p>
+          </form>
+
+          <form id="accept" class="hidden" novalidate>
+            <div class="alert warn">You are taking over as Main Admin. Enter the username and the code you were sent, then choose your own password.</div>
+            <div id="accept-message" class="hidden" role="alert"></div>
+            <div class="field"><label for="h-user">Username</label><input type="text" id="h-user" autocapitalize="none" maxlength="40" /></div>
+            <div class="field"><label for="h-code">Handover code</label><input type="text" id="h-code" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
+            <div class="field"><label for="h-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
+              <div class="pw"><input type="password" id="h-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="h-new">Show</button></div></div>
+            <div class="field"><label for="h-again">New password again</label><input type="password" id="h-again" autocomplete="new-password" maxlength="128" /></div>
+            <button type="submit" class="btn">Become Main Admin</button>
+            <p class="foot"><button type="button" class="link" id="accept-back">Back to sign in</button></p>
+          </form>
+
+          <section id="keybox" class="hidden">
+            <div class="alert warn">This is your <strong>recovery key</strong>. It is shown only once. Write it down and keep it safe: it lets you back in if you forget your password.</div>
+            <p class="key" id="key-text"></p>
+            <button type="button" class="btn secondary" id="key-copy">Copy</button>
+            <p></p>
+            <button type="button" class="btn" id="key-done">I have written it down</button>
+          </section>
+
+          <form id="change" class="hidden" novalidate>
+            <div class="alert warn">Please choose your own password before you continue.</div>
+            <div id="change-message" class="hidden" role="alert"></div>
+            <div class="field">
+              <label for="n-current">Temporary or current password</label>
+              <div class="pw"><input type="password" id="n-current" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-current">Show</button></div>
+            </div>
+            <div class="field">
+              <label for="n-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
+              <div class="pw"><input type="password" id="n-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-new">Show</button></div>
+            </div>
+            <div class="field">
+              <label for="n-again">New password again</label>
+              <input type="password" id="n-again" autocomplete="new-password" maxlength="128" />
+            </div>
+            <button type="submit" class="btn">Save my password</button>
+          </form>
+
+          <section id="done" class="hidden">
+            <div class="alert ok" id="welcome"></div>
+            <p class="hint">Your record page opens here in the next version of the portal.</p>
+            <button type="button" class="btn secondary" id="signout">Sign out</button>
+          </section>
+        </div>
+      </div>
+      <p class="foot" id="foot"></p>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/index-1.js"></script>
+    <script src="js/index-2.js"></script>
+
+    <script src="js/index-3.js"></script>
+  </body>
+</html>
