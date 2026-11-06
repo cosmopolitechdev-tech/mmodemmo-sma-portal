@@ -205,6 +205,15 @@ function friendlyErrorFrontend(msg) {
   if (m.indexOf("quota") !== -1) {
     return "The system is busy. Please try again in a minute.";
   }
+  // Google's overload replies when many teachers save at once.
+  if (
+    m.indexOf("too many") !== -1 ||
+    m.indexOf("service invoked") !== -1 ||
+    m.indexOf("server error") !== -1 ||
+    m.indexOf("maximum execution time") !== -1
+  ) {
+    return "The portal is very busy right now. Please wait a minute and try again.";
+  }
   if (m.indexOf("not found") !== -1) {
     return "The requested record was not found.";
   }
@@ -3483,7 +3492,9 @@ function handleSaveWithRetry(saveFunction, params, saveButton, onSuccess) {
         if (onSuccess) onSuccess(result);
       },
       function (err) {
-        _showRetry(err ? err.message : "Server error");
+        // callServer's own failures (no connection, timeout, busy) already carry a plain message.
+        if (err && err.code) _showRetry(err.message, false);
+        else _showRetry(err ? err.message : "Server error");
       },
     );
   }
