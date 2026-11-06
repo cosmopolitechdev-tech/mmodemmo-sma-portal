@@ -11,10 +11,6 @@ var $ = function (id) { return document.getElementById(id); };
         if (config.maintenance && name !== "admin") showAlert_($("message"), "warn", "Only admins can sign in while the portal is being updated.");
       }
 
-      function coordinatorKind() {
-        return document.querySelector("input[name=c-kind]:checked").value;
-      }
-
       function busy(form, on) {
         var btn = form.querySelector("button[type=submit]");
         btn.disabled = on;
@@ -77,13 +73,10 @@ var $ = function (id) { return document.getElementById(id); };
         } else if (form.id === "panel-admin") {
           password = $("a-pass").value;
           call = "adminLogin"; args = [$("a-user").value, password];
-        } else if (coordinatorKind() === "circuit") {
+        } else {
+          // Circuit coordinators only; school coordinators use the Teacher tab (owner, 2026-11-06).
           password = $("c-pass").value;
           call = "circuitCoordinatorLogin"; args = [$("c-circuit").value, $("c-staff").value, password];
-        } else {
-          password = $("c-pass").value;
-          // No EMIS code: the portal knows each coordinator's school (SPEC § 6).
-          call = "coordinatorLogin"; args = ["", $("c-staff").value, password];
         }
         if (args.slice(-2).some(function (a) { return !String(a).trim(); }) || (call === "circuitCoordinatorLogin" && !args[0])) {
           showAlert_($("message"), "error", "Please fill in every box.");
@@ -95,8 +88,7 @@ var $ = function (id) { return document.getElementById(id); };
         // Each call is written out so the tests can check the server function exists.
         if (call === "teacherLogin") callServer_("teacherLogin", args, done, failed, onBusy(form));
         else if (call === "adminLogin") callServer_("adminLogin", args, done, failed, onBusy(form));
-        else if (call === "circuitCoordinatorLogin") callServer_("circuitCoordinatorLogin", args, done, failed, onBusy(form));
-        else callServer_("coordinatorLogin", args, done, failed, onBusy(form));
+        else callServer_("circuitCoordinatorLogin", args, done, failed, onBusy(form));
       }
 
       function submitChange(ev) {
@@ -132,18 +124,13 @@ var $ = function (id) { return document.getElementById(id); };
           sel.appendChild(o);
         });
         $("tab-coordinator").classList.toggle("hidden", c.mode === "school"); // one school: admins and teachers only
+        $("t-note").classList.toggle("hidden", c.mode === "school");
         selectTab("teacher");
       }
 
       TABS.forEach(function (t) {
         $("tab-" + t).addEventListener("click", function () { selectTab(t); });
         $("panel-" + t).addEventListener("submit", submitSignIn);
-      });
-      document.querySelectorAll("input[name=c-kind]").forEach(function (r) {
-        r.addEventListener("change", function () {
-          var circuit = coordinatorKind() === "circuit";
-          $("c-circuit-field").classList.toggle("hidden", !circuit);
-        });
       });
       document.querySelectorAll(".show-pw").forEach(function (b) {
         b.addEventListener("click", function () {

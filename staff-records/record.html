@@ -178,6 +178,12 @@
       .year-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
       input[type=date] { min-height: 44px; font: inherit; font-size: 16px; padding: 6px 8px; border: 1px solid #9aa5b1; border-radius: 8px; width: 100%; background: #fff; }
       .flash { animation: flash 1.2s; }
+      /* Choosing a person by name: the matches are big buttons, never touching. */
+      .picks { list-style: none; margin: 6px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+      .picks .sbtn { width: 100%; justify-content: flex-start; text-align: left; font-weight: 500; padding: 8px 12px; line-height: 1.3; }
+      .picked { margin: 4px 0 8px; font-size: 14px; color: var(--ok); font-weight: 600; }
+      .picked.bad { color: var(--error); }
+      .leave label { display: block; margin-top: 8px; }
       @keyframes flash { from { background: #fff4e5; } to { background: transparent; } }
     </style>
   </head>
@@ -260,6 +266,10 @@
           <h2 style="font-size:18px">Reminder message</h2>
           <div class="field"><label for="set-REMINDER_MESSAGE">WhatsApp reminder <span class="hint">— {first_name}, {percent}, {missing}, {link} are filled in</span></label>
             <textarea id="set-REMINDER_MESSAGE" maxlength="500"></textarea><div class="err" id="e-set-REMINDER_MESSAGE"></div></div>
+          <h2 style="font-size:18px">Portal link</h2>
+          <div class="field"><label for="set-PORTAL_LINK">The address people are sent <span class="hint">— in WhatsApp messages, slips and emails</span></label>
+            <input type="text" inputmode="url" id="set-PORTAL_LINK" maxlength="200" autocapitalize="none" placeholder="https://…" />
+            <div class="hint" id="portal-link-hint">Leave it empty to send the Google (script.google.com) link.</div><div class="err" id="e-set-PORTAL_LINK"></div></div>
           <div id="waves-section">
             <h2 style="font-size:18px">Roll-out waves</h2>
             <p class="hint">Tick the circuits that may sign in now. Tick none to open the portal to everyone.</p>
@@ -286,7 +296,7 @@
         <ul class="cards" id="admin-list"></ul>
         <div class="panel" id="add-admin">
           <h2 style="margin-top:0;font-size:18px">Add a sub-admin</h2>
-          <div class="field"><label for="new-displayName">Name</label><input type="text" id="new-displayName" maxlength="60" /><div class="err" id="e-new-displayName"></div></div>
+          <div class="field"><label for="new-displayName">Name</label><input type="text" id="new-displayName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-new-displayName"></div></div>
           <div class="field"><label for="new-username">Username <span class="hint">— for signing in</span></label><input type="text" id="new-username" maxlength="30" autocapitalize="none" /><div class="err" id="e-new-username"></div></div>
           <div class="field"><label for="new-whatsapp">WhatsApp number <span class="hint">— optional</span></label><input type="tel" id="new-whatsapp" maxlength="13" /><div class="err" id="e-new-whatsapp"></div></div>
           <div class="field"><label for="new-email">Email <span class="hint">— optional</span></label><input type="email" id="new-email" maxlength="120" /><div class="err" id="e-new-email"></div></div>
@@ -311,7 +321,7 @@
           <div id="handover-form">
             <div class="field"><label for="handover-successor">Successor</label><select id="handover-successor"></select><div class="err" id="e-ho-successor"></div></div>
             <div id="handover-new" class="hidden">
-              <div class="field"><label for="ho-displayName">Name</label><input type="text" id="ho-displayName" maxlength="60" /><div class="err" id="e-ho-displayName"></div></div>
+              <div class="field"><label for="ho-displayName">Name</label><input type="text" id="ho-displayName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ho-displayName"></div></div>
               <div class="field"><label for="ho-username">Username for them</label><input type="text" id="ho-username" maxlength="30" autocapitalize="none" /><div class="err" id="e-ho-username"></div></div>
               <div class="field"><label for="ho-whatsapp">WhatsApp number</label><input type="tel" id="ho-whatsapp" maxlength="13" /><div class="err" id="e-ho-whatsapp"></div></div>
               <div class="field"><label for="ho-email">Email</label><input type="email" id="ho-email" maxlength="120" /><div class="err" id="e-ho-email"></div></div>
@@ -349,9 +359,9 @@
         <div class="panel">
           <h2 style="margin-top:0;font-size:18px">Add one teacher</h2>
           <div class="field"><label for="one-staff_id">Staff ID</label><input type="text" id="one-staff_id" inputmode="numeric" maxlength="15" autocomplete="off" /><div class="err" id="e-one-staff_id" role="alert"></div></div>
-          <div class="field"><label for="one-surname">Surname</label><input type="text" id="one-surname" maxlength="60" autocomplete="off" autocapitalize="characters" /><div class="err" id="e-one-surname" role="alert"></div></div>
-          <div class="field"><label for="one-first_name">First name</label><input type="text" id="one-first_name" maxlength="60" autocomplete="off" autocapitalize="characters" /><div class="err" id="e-one-first_name" role="alert"></div></div>
-          <div class="field"><label for="one-other_middle_names">Other names <span class="hint">— if any</span></label><input type="text" id="one-other_middle_names" maxlength="60" autocomplete="off" autocapitalize="characters" /><div class="err" id="e-one-other_middle_names" role="alert"></div></div>
+          <div class="field"><label for="one-surname">Surname</label><input type="text" id="one-surname" maxlength="60" autocomplete="off" autocapitalize="characters" class="upper" /><div class="err" id="e-one-surname" role="alert"></div></div>
+          <div class="field"><label for="one-first_name">First name</label><input type="text" id="one-first_name" maxlength="60" autocomplete="off" autocapitalize="characters" class="upper" /><div class="err" id="e-one-first_name" role="alert"></div></div>
+          <div class="field"><label for="one-other_middle_names">Other names <span class="hint">— if any</span></label><input type="text" id="one-other_middle_names" maxlength="60" autocomplete="off" autocapitalize="characters" class="upper" /><div class="err" id="e-one-other_middle_names" role="alert"></div></div>
           <div class="field" id="one-school-field"><label for="one-school_emis_code">School <span class="hint">— or leave it: the teacher chooses at first sign-in</span></label><select id="one-school_emis_code"></select></div>
           <div class="field"><label for="one-phone_number">Phone <span class="hint">— optional</span></label><input type="tel" id="one-phone_number" inputmode="tel" maxlength="16" autocomplete="off" /><div class="err" id="e-one-phone_number" role="alert"></div></div>
           <div class="err" id="e-one" role="alert"></div>
@@ -402,9 +412,9 @@
         </details>
         <div class="toolbar">
           <select id="school-circuit-filter" aria-label="Circuit"></select>
-          <select id="school-sort" aria-label="Sort schools by">
-            <option value="pct">Lowest % first</option>
-            <option value="name">By name</option>
+          <select id="school-sort" aria-label="Order of the schools">
+            <option value="pct">Least complete first</option>
+            <option value="name">Names A to Z</option>
           </select>
         </div>
         <ul class="cards" id="district-schools"></ul>
@@ -420,19 +430,20 @@
           <textarea class="msgbox hidden" id="circuit-text" readonly aria-label="Circuit message"></textarea>
           <div class="more" id="circuit-export"></div>
         </div>
-        <div class="panel" id="name-panel">
-          <h2 style="margin-top:0;font-size:18px">Name a school's ICT coordinator</h2>
-          <p class="hint">Type their Staff ID. If their school is not in the list yet, they enter its EMIS code and name when they sign in.</p>
-          <div class="field"><label for="name-id">Staff ID</label><input type="text" id="name-id" inputmode="numeric" maxlength="15" autocomplete="off" /></div>
+        <div class="panel hidden" id="name-panel">
+          <h2 style="margin-top:0;font-size:18px">A school that is not on the list yet</h2>
+          <p class="hint">Choose the teacher who will be its ICT coordinator. They then sign in on the Teacher tab and type the school's EMIS code and name. For a school already listed below, use that school's own "Name School ICT Coordinator" button.</p>
+          <div id="name-picker"></div>
           <div class="err" id="e-name" role="alert"></div>
-          <button type="button" class="btn" id="name-save">Name coordinator</button>
+          <button type="button" class="btn" id="name-save">Name School ICT Coordinator</button>
         </div>
         <div class="toolbar">
-          <select id="circuit-filter" aria-label="Show">
+          <label for="circuit-filter" class="hint" style="flex-basis:100%;margin:0">Show</label>
+          <select id="circuit-filter">
             <option value="all">All schools</option>
-            <option value="todo">To set up / no coordinator</option>
-            <option value="under">Not finished (under 100%)</option>
-            <option value="under50">Under 50%</option>
+            <option value="todo">Schools with no ICT coordinator (or not set up yet)</option>
+            <option value="under">Schools not finished (below 100%)</option>
+            <option value="under50">Schools below 50%</option>
           </select>
         </div>
         <ul class="cards" id="school-list"></ul>
@@ -457,10 +468,10 @@
         </div>
         <div class="toolbar">
           <label class="check"><input type="checkbox" id="only-incomplete" /> Only those not finished</label>
-          <select id="sort" aria-label="Sort by">
-            <option value="pct">Lowest % first</option>
-            <option value="name">By name</option>
-            <option value="updated">Least recently updated first</option>
+          <select id="sort" aria-label="Order of the teachers">
+            <option value="pct">Least complete first</option>
+            <option value="name">Names A to Z</option>
+            <option value="updated">Longest without an update first</option>
           </select>
         </div>
         <ul class="cards" id="teacher-list"></ul>

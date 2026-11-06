@@ -127,15 +127,13 @@
                 <div class="pw"><input type="password" id="t-pass" autocomplete="current-password" maxlength="128" required /><button type="button" class="show-pw" aria-controls="t-pass">Show</button></div>
               </div>
               <button type="submit" class="btn">Sign in</button>
+              <p class="hint" id="t-note">School ICT coordinators sign in here too: your school's page opens with your own record.</p>
             </form>
 
             <form id="panel-coordinator" class="hidden" role="tabpanel" aria-labelledby="tab-coordinator" novalidate>
-              <div class="choices" role="radiogroup" aria-label="Coordinator for">
-                <label><input type="radio" name="c-kind" value="school" checked /> My school</label>
-                <label><input type="radio" name="c-kind" value="circuit" /> My circuit</label>
-              </div>
-              <div class="field hidden" id="c-circuit-field">
-                <label for="c-circuit">Circuit</label>
+              <p class="hint" style="margin-top:0">For circuit ICT coordinators, to follow up the schools of their circuit. To fill in your own staff record, use the Teacher tab.</p>
+              <div class="field" id="c-circuit-field">
+                <label for="c-circuit">Your circuit</label>
                 <select id="c-circuit"></select>
               </div>
               <div class="field">
