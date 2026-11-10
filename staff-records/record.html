@@ -257,6 +257,7 @@
           <h2 style="margin-top:0;font-size:18px">District</h2>
           <div class="field"><label for="set-REGION">Region</label><select id="set-REGION"></select><div class="err" id="e-set-REGION"></div></div>
           <div class="field"><label for="set-MMDA">District (MMDA)</label><input type="text" id="set-MMDA" list="set-mmdas" maxlength="100" /><datalist id="set-mmdas"></datalist><div class="err" id="e-set-MMDA"></div></div>
+          <div class="field" id="set-district-code-field"><label for="set-DISTRICT_CODE">District code <span class="hint">— every school name in the import template begins with it, e.g. 0622</span></label><input type="text" id="set-DISTRICT_CODE" inputmode="numeric" maxlength="6" /><div class="err" id="e-set-DISTRICT_CODE"></div></div>
           <h2 style="font-size:18px">Academic year and term</h2>
           <p class="hint">Written in the staff list's Academic Year and Term columns. Records are collected once a year: changing the academic year asks every teacher to confirm their record again.</p>
           <div class="year-pick">
@@ -338,10 +339,22 @@
       </section>
 
       <section id="import-view" class="hidden">
+        <div class="panel hidden" id="import-setup">
+          <h2 style="margin-top:0;font-size:18px">Circuits and district code</h2>
+          <p class="hint">The template is built from these: its Circuit column offers the circuits below, and every school name must begin with the district code (e.g. 0622 Kokoben D/A JHS).</p>
+          <div class="field"><label for="import-district-code">District code</label><input type="text" id="import-district-code" inputmode="numeric" maxlength="6" autocomplete="off" />
+            <div class="hint hidden" id="import-code-hint">The Main Admin sets it in Settings.</div><div class="err" id="e-import-code" role="alert"></div></div>
+          <button type="button" class="sbtn" id="import-code-save">Save the district code</button>
+          <div class="field" style="margin-top:12px"><label for="import-circuits">Circuits <span class="hint">— one per line</span></label>
+            <textarea id="import-circuits" spellcheck="false" rows="8"></textarea>
+            <div class="hint" id="import-circuit-status"></div><div class="err" id="e-import-circuit" role="alert"></div></div>
+          <button type="button" class="sbtn" id="import-save-circuits">Save the circuits</button>
+        </div>
         <div class="panel">
           <h2 style="margin-top:0;font-size:18px">Add many teachers from a file</h2>
+          <p class="hint" id="import-first-step">This is the first step: the school ICT coordinators fill the template for their schools, and each school in it is added with its teachers. Then circuit and school coordinators can be named.</p>
           <ol class="steps">
-            <li><strong>Download the template.</strong> It has the columns, a drop-down of your schools, and checks that turn away wrong entries.
+            <li><strong>Download the template.</strong> It has the columns, a drop-down of your circuits, and checks that turn away wrong entries.
               <div><button type="button" class="sbtn" id="import-template">Download the template</button></div></li>
             <li><strong>Fill it</strong> in Excel, Google Sheets or WPS: one teacher per row, keep the title row.</li>
             <li><strong>Choose the filled file</strong> (.xlsx or .csv) and check it. Nobody is added until you confirm.</li>

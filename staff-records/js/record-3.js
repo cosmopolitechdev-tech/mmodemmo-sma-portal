@@ -1598,19 +1598,71 @@ var $ = function (id) { return document.getElementById(id); };
           $("one-school-field").classList.toggle("hidden", !!r.schoolMode);
           fillOptions($("one-school_emis_code"), [], "", "— not known yet —");
           r.schools.forEach(function (x) { $("one-school_emis_code").appendChild(el("option", { value: x.emis }, x.name + " (" + x.circuit + ")")); });
+          renderImportSetup(r);
+        }, fail);
+      }
+
+      /* The circuits and district code the template is built from; changed here by those allowed to. */
+      function renderImportSetup(r) {
+        $("import-setup").classList.toggle("hidden", !!r.schoolMode);
+        $("import-first-step").classList.toggle("hidden", !!r.schoolMode);
+        $("import-district-code").value = r.districtCode || "";
+        $("import-district-code").disabled = !r.can.districtCode;
+        $("import-code-save").classList.toggle("hidden", !r.can.districtCode);
+        $("import-code-hint").classList.toggle("hidden", !!r.can.districtCode);
+        S.circuitsConfirmed = !!(r.schoolMode || r.circuitsConfirmed);
+        $("import-circuits").value = r.circuits.join("\n");
+        $("import-circuits").disabled = !r.can.circuits;
+        $("import-save-circuits").classList.toggle("hidden", !r.can.circuits);
+        var st = $("import-circuit-status");
+        st.className = r.circuitsConfirmed ? "hint" : "err";
+        st.textContent = r.circuitsConfirmed ? r.circuits.length + " circuit" + (r.circuits.length === 1 ? "" : "s") + " in the template's drop-down."
+          : "Not provided yet. Check the list, correct it (one circuit per line) and press Save the circuits before downloading the template." +
+            (r.can.circuits ? "" : " Ask an admin who manages schools.");
+      }
+
+      /* Before the template: the admin must have provided the circuits; otherwise say so and go there. */
+      function promptCircuits(message) {
+        confirmBox_({ title: "Provide the circuits first", message: message || "The template's Circuit column offers the district's circuits, so they must be provided first.",
+          detail: "List every circuit of the district, one per line, under Circuits at the top of this tab, then press Save the circuits.", ok: "Go to the circuits" }, function () {
+          $("import-setup").scrollIntoView();
+          if (!$("import-circuits").disabled) $("import-circuits").focus();
+        });
+      }
+
+      function saveImportCircuits() {
+        $("e-import-circuit").textContent = "";
+        $("import-save-circuits").disabled = true;
+        callServer_("saveImportCircuits", [S.token, $("import-circuits").value], function (r) {
+          $("import-save-circuits").disabled = false;
+          if (!r || !r.ok) { if (r && r.code === "INVALID") $("e-import-circuit").textContent = r.message; else fail(r); return; }
+          showAlert_($("alert"), "ok", "Circuits saved: " + r.circuits.length + "." + (r.kept.length ? " Kept, because schools or a coordinator use them: " + r.kept.join(", ") + "." : ""));
+          openImport();
+        }, function (e) { $("import-save-circuits").disabled = false; fail(e); });
+      }
+
+      function saveDistrictCode() {
+        $("e-import-code").textContent = "";
+        callServer_("saveSettings", [S.token, { DISTRICT_CODE: $("import-district-code").value.trim() }], function (r) {
+          if (r && r.ok) { showAlert_($("alert"), "ok", "District code saved."); openImport(); return; }
+          if (r && r.errors && r.errors.DISTRICT_CODE) { $("e-import-code").textContent = r.errors.DISTRICT_CODE; return; }
+          fail(r);
         }, fail);
       }
 
       function downloadTemplate() {
+        if (S.circuitsConfirmed === false) { promptCircuits(); return; }
         var b = $("import-template"), was = b.textContent;
         b.disabled = true;
         b.textContent = "Preparing the file…";
         callServer_("getImportTemplate", [S.token], function (r) {
           b.disabled = false;
           b.textContent = was;
+          if (r && r.code === "NO_CIRCUITS") { promptCircuits(r.message); return; }
+          if (r && r.code === "NO_DISTRICT_CODE") { showAlert_($("alert"), "error", r.message); window.scrollTo(0, 0); return; }
           if (!r || !r.ok) { fail(r); return; }
           saveBase64(r);
-          showAlert_($("alert"), "ok", r.fileName + " — with " + r.schools + " school" + (r.schools === 1 ? "" : "s") + " in its drop-down.");
+          showAlert_($("alert"), "ok", r.fileName + (r.circuits ? " — with " + r.circuits + " circuit" + (r.circuits === 1 ? "" : "s") + " in its drop-down." : ""));
         }, function (e) { b.disabled = false; b.textContent = was; fail(e); });
       }
 
@@ -1629,7 +1681,8 @@ var $ = function (id) { return document.getElementById(id); };
       function importRowText(row, word) {
         var v = row.values;
         return word + " " + row.line + ": " + [v.staff_id, [v.surname, v.first_name, v.other_middle_names].filter(Boolean).join(" "), row.school, v.phone_number].filter(Boolean).join(" · ") +
-          " — " + (row.status === "error" ? row.problems.join("; ") : row.status === "exists" ? "already in the portal (left as it is)" : "will be added");
+          " — " + (row.status === "error" ? row.problems.join("; ") : row.status === "exists" ? "already in the portal (left as it is)"
+          : row.newSchool ? "will be added, with the new school (" + v.circuit + " circuit)" : "will be added");
       }
 
       function checkImport() {
@@ -1645,7 +1698,7 @@ var $ = function (id) { return document.getElementById(id); };
             S.importFile = file;
             var ul = $("import-rows");
             while (ul.firstChild) ul.removeChild(ul.firstChild);
-            $("import-counts").textContent = r.counts.add + " to add · " + r.counts.exists + " already in the portal · " + r.counts.errors + " with problems" +
+            $("import-counts").textContent = r.counts.add + " to add" + (r.counts.schools ? " · " + r.counts.schools + " new school" + (r.counts.schools === 1 ? "" : "s") : "") + " · " + r.counts.exists + " already in the portal · " + r.counts.errors + " with problems" +
               (r.tooMany ? " · more than " + r.max + " rows: split the file" : "");
             $("import-fix").classList.toggle("hidden", !r.counts.errors);
             // Problems first, so they are seen without scrolling.
@@ -1665,7 +1718,8 @@ var $ = function (id) { return document.getElementById(id); };
       function importDone(r) {
         S.imported = r;
         renderSlips();
-        showAlert_($("alert"), "ok", r.added.length + " teacher" + (r.added.length === 1 ? " was" : "s were") + " added. Print the slips now: the passwords are shown only once.");
+        showAlert_($("alert"), "ok", r.added.length + " teacher" + (r.added.length === 1 ? " was" : "s were") + " added" +
+          (r.schoolsAdded ? ", with " + r.schoolsAdded + " new school" + (r.schoolsAdded === 1 ? "" : "s") : "") + ". Print the slips now: the passwords are shown only once.");
       }
 
       function addImport() {
@@ -1752,6 +1806,8 @@ var $ = function (id) { return document.getElementById(id); };
 
       $("tab-import").addEventListener("click", openImport);
       $("import-template").addEventListener("click", downloadTemplate);
+      $("import-code-save").addEventListener("click", saveDistrictCode);
+      $("import-save-circuits").addEventListener("click", saveImportCircuits);
       $("import-file").addEventListener("change", function () { $("e-import").textContent = ""; $("import-preview").classList.add("hidden"); S.importFile = null; });
       $("one-add").addEventListener("click", addOne);
       $("import-check").addEventListener("click", checkImport);
@@ -1952,6 +2008,7 @@ var $ = function (id) { return document.getElementById(id); };
           if (!r || !r.ok) { fail(r); return; }
           S.settings = r;
           $("waves-section").classList.toggle("hidden", !!S.schoolMode);
+          $("set-district-code-field").classList.toggle("hidden", !!S.schoolMode);
           renderSettings();
         }, fail);
       }
@@ -1960,6 +2017,7 @@ var $ = function (id) { return document.getElementById(id); };
         var r = S.settings, v = r.values;
         fillOptions($("set-REGION"), r.regions, v.REGION);
         $("set-MMDA").value = v.MMDA;
+        $("set-DISTRICT_CODE").value = v.DISTRICT_CODE || "";
         var dl = $("set-mmdas");
         while (dl.firstChild) dl.removeChild(dl.firstChild);
         r.mmdas.forEach(function (m) { dl.appendChild(el("option", { value: m })); });
@@ -2007,7 +2065,7 @@ var $ = function (id) { return document.getElementById(id); };
       function collectSettings() {
         var ticked = function (box) { return [].map.call(box.querySelectorAll("input:checked"), function (x) { return x.value; }); };
         var out = {
-          REGION: $("set-REGION").value, MMDA: $("set-MMDA").value, ACADEMIC_YEAR: $("set-ACADEMIC_YEAR").value, TERM: $("set-TERM").value, REMINDER_MESSAGE: $("set-REMINDER_MESSAGE").value, PORTAL_LINK: $("set-PORTAL_LINK").value.trim(),
+          REGION: $("set-REGION").value, MMDA: $("set-MMDA").value, DISTRICT_CODE: $("set-DISTRICT_CODE").value.trim(), ACADEMIC_YEAR: $("set-ACADEMIC_YEAR").value, TERM: $("set-TERM").value, REMINDER_MESSAGE: $("set-REMINDER_MESSAGE").value, PORTAL_LINK: $("set-PORTAL_LINK").value.trim(),
           MAINTENANCE_MODE: String($("set-MAINTENANCE_MODE").checked), MAINTENANCE_MESSAGE: $("set-MAINTENANCE_MESSAGE").value,
           COORDINATOR_PASSWORD_RESETS: String($("set-COORDINATOR_PASSWORD_RESETS").checked), ALLOWED_CIRCUITS: ticked($("set-waves")).join(","),
           REQUIRED_FIELDS: $("set-req-template").checked ? "" : ticked($("set-required")).join(",")
