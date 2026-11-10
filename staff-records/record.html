@@ -22,6 +22,8 @@
     --ok-bg: #e3f9e5;
     --warn-bg: #fff4e5;
     --warn: #7a4a00;
+    --info: #1d4f91;
+    --info-bg: #e8f1fc;
     --radius: 10px;
   }
   * { box-sizing: border-box; }
@@ -55,6 +57,9 @@
   .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; min-height: 44px; padding-top: 10px; }
   .check input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; }
   .err { color: var(--error); font-size: 14px; margin-top: 4px; }
+  /* A message written under a box or button is an error: the same red as the error boxes. */
+  .err:not(:empty) { background: var(--error-bg); border-left: 4px solid var(--error); border-radius: 6px; padding: 6px 10px; }
+  .err:not(:empty)::before { content: "\2715"; font-weight: 700; margin-right: 8px; }
   .err:empty { display: none; }
   fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px 12px; margin: 0 0 16px; min-width: 0; }
   legend { font-weight: 700; padding: 0 6px; }
@@ -80,10 +85,19 @@
     border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin .7s linear infinite; }
   @keyframes btn-spin { to { transform: rotate(360deg); } }
   .inline-msg { margin: 8px 0 4px; flex-basis: 100%; }
-  .alert { border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 15px; }
-  .alert.error { background: var(--error-bg); color: var(--error); border-left: 4px solid var(--error); }
-  .alert.ok { background: var(--ok-bg); color: var(--ok); }
-  .alert.warn { background: var(--warn-bg); color: var(--warn); border-left: 4px solid #f0a020; }
+  /* Every message by its kind, the same on every page: green done, red not done, amber take
+     care, blue please wait. The symbol tells them apart without colour too. */
+  .alert { border-radius: 8px; padding: 10px 12px 10px 38px; margin-bottom: 14px; font-size: 15px; position: relative; border-left: 4px solid transparent; }
+  .alert::before { position: absolute; left: 10px; top: 9px; width: 20px; height: 20px; border-radius: 50%; color: #fff;
+    font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+  .alert.ok { background: var(--ok-bg); color: var(--ok); border-left-color: var(--ok); }
+  .alert.ok::before { content: "\2713"; background: var(--ok); }
+  .alert.error { background: var(--error-bg); color: var(--error); border-left-color: var(--error); }
+  .alert.error::before { content: "\2715"; background: var(--error); }
+  .alert.warn { background: var(--warn-bg); color: var(--warn); border-left-color: #f0a020; }
+  .alert.warn::before { content: "!"; background: #c77700; }
+  .alert.info { background: var(--info-bg); color: var(--info); border-left-color: var(--info); }
+  .alert.info::before { content: "i"; background: var(--info); font-style: italic; font-family: Georgia, serif; }
   .btn.danger { background: var(--error); }
   /* Fold-out headings are tapped like buttons: as tall as one. */
   summary { padding: 10px 0; cursor: pointer; }

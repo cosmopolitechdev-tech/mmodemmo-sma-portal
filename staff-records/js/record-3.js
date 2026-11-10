@@ -1684,7 +1684,7 @@ var $ = function (id) { return document.getElementById(id); };
         $("import-circuits").disabled = !r.can.circuits;
         $("import-save-circuits").classList.toggle("hidden", !r.can.circuits);
         var st = $("import-circuit-status");
-        st.className = r.circuitsConfirmed ? "hint" : "err";
+        st.className = r.circuitsConfirmed ? "hint" : "alert warn"; // a reminder, not an error
         st.textContent = r.circuitsConfirmed ? r.circuits.length + " circuit" + (r.circuits.length === 1 ? "" : "s") + " in the template's drop-down."
           : "Not provided yet. Check the list, correct it (one circuit per line) and press Save the circuits before downloading the template." +
             (r.can.circuits ? "" : " Ask an admin who manages schools.");

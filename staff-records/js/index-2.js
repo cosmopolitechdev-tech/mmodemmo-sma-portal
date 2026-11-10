@@ -25,6 +25,14 @@
       var b = currentButton_(), release = markBusy_(b);
       onOk = withButton_(b, release, onOk);
       onFail = withButton_(b, release, onFail);
+      // Pages that say nothing while retrying get a blue note under the button; it goes when the
+      // answer comes (the next message replaces it, or the release below removes it).
+      if (!onBusy && b) {
+        onBusy = function () { if (onScreen_(b)) inlineMessage_(b, "info", "The system is busy — trying again, please wait…"); };
+        var clear = function (fn) { return function (x) { var m = b.nextSibling; if (m && m.classList && m.classList.contains("info")) m.parentNode.removeChild(m); fn(x); }; };
+        onOk = clear(onOk);
+        onFail = clear(onFail);
+      }
     }
     attempt = attempt || 0;
     var retry = function (why) {
@@ -191,6 +199,16 @@
     };
   }
 
+  /* A coloured message right under a button, replacing the one already there. */
+  function inlineMessage_(b, kind, text) {
+    var msg = b.nextSibling && b.nextSibling.classList && b.nextSibling.classList.contains("inline-msg") ? b.nextSibling : document.createElement("div");
+    msg.className = "alert inline-msg " + kind;
+    msg.setAttribute("role", kind === "error" ? "alert" : "status");
+    msg.textContent = text;
+    if (msg.parentNode !== b.parentNode) b.parentNode.insertBefore(msg, b.nextSibling);
+    return msg;
+  }
+
   /* Shows a message. A page banner (data-banner) gives way to a message under the button that
      started the action; the banner is used when there is none, or when that button is gone.
      Returns the element shown, for scrolling to it. */
@@ -202,11 +220,7 @@
     node.textContent = text;
     if (!b) return node;
     node.classList.add("hidden");
-    var msg = document.createElement("div");
-    msg.className = "alert inline-msg " + kind;
-    msg.setAttribute("role", "alert");
-    msg.textContent = text;
-    b.parentNode.insertBefore(msg, b.nextSibling);
+    var msg = inlineMessage_(b, kind, text);
     // A page that redraws the button's card, or moves to another view, right after would take the
     // message out of sight with it: the banner shows it then.
     setTimeout(function () {
