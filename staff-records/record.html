@@ -68,6 +68,18 @@
   a.btn { text-align: center; line-height: 48px; text-decoration: none; }
   .btn[disabled] { opacity: .65; cursor: progress; }
   .btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  /* Every button answers the pointer and shows a spinner while its action runs. */
+  button, .btn, .sbtn { transition: background-color .15s, color .15s, box-shadow .15s; }
+  .btn:hover:not([disabled]) { background: var(--primary); box-shadow: 0 2px 8px rgba(110, 23, 40, .25); }
+  .btn.secondary:hover:not([disabled]), .sbtn:hover:not([disabled]):not([aria-disabled="true"]) { background: #f6e3e7; color: var(--primary); }
+  .btn.danger:hover:not([disabled]) { background: #8f1c13; }
+  .tab:hover { color: var(--accent); background: #f8f1f2; }
+  .pw button:hover { text-decoration: underline; }
+  button.is-busy { cursor: progress; opacity: .8; }
+  button.is-busy::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+    border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin .7s linear infinite; }
+  @keyframes btn-spin { to { transform: rotate(360deg); } }
+  .inline-msg { margin: 8px 0 4px; flex-basis: 100%; }
   .alert { border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 15px; }
   .alert.error { background: var(--error-bg); color: var(--error); border-left: 4px solid var(--error); }
   .alert.ok { background: var(--ok-bg); color: var(--ok); }
@@ -166,15 +178,10 @@
       .counts li { background: #f4efe6; border-radius: 14px; padding: 4px 10px; }
       textarea.msgbox { min-height: 160px; margin-top: 10px; font-size: 14px; }
       .slip-school h3 { font-size: 16px; margin: 16px 0 8px; }
-      .slip { border: 1px dashed #9aa5b1; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; page-break-inside: avoid; overflow-wrap: anywhere; }
-      .slip .key { margin: 6px 0; }
-      @media print {
-        body { padding: 0; background: #fff; }
-        body * { visibility: hidden; }
-        #slips, #slips * { visibility: visible; }
-        #slips { position: absolute; left: 0; top: 0; width: 100%; }
-        .slip-school { page-break-after: always; }
-      }
+      /* A person's sign-in on a card: the temporary password stays here until they choose their own. */
+      .pwline { margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: #f4efe6; font-size: 14px; }
+      .pwline.none { background: #fff4e5; color: var(--warn); }
+      .pwline .key { font-family: Consolas, "Courier New", monospace; font-size: 17px; font-weight: 700; letter-spacing: 1px; color: var(--text); overflow-wrap: anywhere; }
       .year-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
       input[type=date] { min-height: 44px; font: inherit; font-size: 16px; padding: 6px 8px; border: 1px solid #9aa5b1; border-radius: 8px; width: 100%; background: #fff; }
       .flash { animation: flash 1.2s; }
@@ -210,7 +217,7 @@
 
     <main class="page">
       <p id="loading">Loading…</p>
-      <div id="alert" class="hidden" role="alert"></div>
+      <div id="alert" class="hidden" role="alert" data-banner></div>
         <div id="temp-box" class="panel hidden" role="dialog" aria-labelledby="temp-title">
           <h2 style="margin-top:0" id="temp-title">New temporary password</h2>
           <p id="temp-for"></p>
@@ -280,7 +287,11 @@
           <label class="check"><input type="checkbox" id="set-MAINTENANCE_MODE" /> Close the portal for teachers and coordinators (admins can still work)</label>
           <div class="field"><label for="set-MAINTENANCE_MESSAGE">Message they see</label><input type="text" id="set-MAINTENANCE_MESSAGE" maxlength="300" /><div class="err" id="e-set-MAINTENANCE_MESSAGE"></div></div>
           <h2 style="font-size:18px">Passwords and sessions</h2>
-          <label class="check"><input type="checkbox" id="set-COORDINATOR_PASSWORD_RESETS" /> ICT coordinators may give temporary passwords</label>
+          <p class="hint" style="margin-bottom:4px">What coordinators may do for the people below them (admins always can):</p>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_PASSWORD_RESETS" /> Circuit coordinators may give temporary passwords (school coordinators and teachers)</label>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_SIGNIN_CONTROL" /> Circuit coordinators may switch sign-in off or on, and switch off or lock a school coordinator's access</label>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_PASSWORD_RESETS" /> School ICT coordinators may give their teachers temporary passwords</label>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_SIGNIN_CONTROL" /> School ICT coordinators may switch their teachers' sign-in off or on</label>
           <div class="field"><label for="set-TEMP_PASSWORD_DAYS">Temporary passwords work for (days)</label><input type="text" inputmode="numeric" id="set-TEMP_PASSWORD_DAYS" maxlength="3" /><div class="err" id="e-set-TEMP_PASSWORD_DAYS"></div></div>
           <div class="field"><label for="set-SESSION_IDLE_MINUTES">Sign out after this many idle minutes</label><input type="text" inputmode="numeric" id="set-SESSION_IDLE_MINUTES" maxlength="3" /><div class="err" id="e-set-SESSION_IDLE_MINUTES"></div></div>
           <div class="field"><label for="set-SESSION_MAX_HOURS">Sign out after this many hours at most</label><input type="text" inputmode="numeric" id="set-SESSION_MAX_HOURS" maxlength="2" /><div class="err" id="e-set-SESSION_MAX_HOURS"></div></div>
@@ -310,7 +321,7 @@
           <p class="hint">If you are leaving the district or this role. Your successor gets a one-time code and chooses their own password; until they accept, nothing changes.</p>
           <div id="handover-pending" class="hidden">
             <div class="alert warn" id="handover-pending-text"></div>
-            <div class="field"><label for="handover-resend-password">Your password (to send a new code)</label><input type="password" id="handover-resend-password" maxlength="128" autocomplete="current-password" /></div>
+            <div class="field"><label for="handover-resend-password">Your password (to send a new code)</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="handover-resend-password" maxlength="128" autocomplete="current-password" /></div>
             <div class="more"><button type="button" class="sbtn" id="handover-resend">Send a new code</button><button type="button" class="sbtn" id="handover-cancel">Cancel the handover</button></div>
           </div>
           <div id="handover-code-box" class="hidden">
@@ -332,7 +343,7 @@
               <label class="check"><input type="radio" name="ho-outgoing" value="remove" /> Remove my access</label>
               <div class="err" id="e-ho-outgoing"></div>
             </fieldset>
-            <div class="field"><label for="handover-password">Your password, to confirm</label><input type="password" id="handover-password" maxlength="128" autocomplete="current-password" /></div>
+            <div class="field"><label for="handover-password">Your password, to confirm</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="handover-password" maxlength="128" autocomplete="current-password" /></div>
             <button type="button" class="btn" id="handover-start">Start the handover</button>
           </div>
         </div>
@@ -380,15 +391,15 @@
           <div class="err" id="e-one" role="alert"></div>
           <button type="button" class="btn" id="one-add">Add this teacher</button>
         </div>
-        <div class="panel hidden" id="slips-panel">
-          <h2 style="margin-top:0;font-size:18px">Temporary password slips</h2>
-          <p class="hint">Shown only now. Print them (or save as PDF in the print window) and give each school's slips to its ICT coordinator.</p>
-          <div class="more">
-            <button type="button" class="sbtn" id="slips-print">Print slips</button>
-            <button type="button" class="sbtn" id="slips-csv">Download CSV</button>
-            <button type="button" class="sbtn" id="slips-done">Done</button>
-          </div>
-          <div id="slips"></div>
+        <div class="panel hidden" id="import-next">
+          <h2 style="margin-top:0;font-size:18px">Next: passwords, one level at a time</h2>
+          <p id="import-next-text"></p>
+          <ol class="steps">
+            <li>On <strong>Overview</strong>, name each circuit's ICT coordinator and press <strong>Give a temporary password</strong> on their card. It stays on the card until they choose their own.</li>
+            <li>Each circuit coordinator signs in (ICT Coordinator tab), names a School ICT Coordinator for every school and gives them a temporary password the same way.</li>
+            <li>Each School ICT Coordinator signs in (Teacher tab) and gives their teachers temporary passwords from their school's page.</li>
+          </ol>
+          <button type="button" class="sbtn" id="import-next-overview">Go to the Overview</button>
         </div>
       </section>
 
@@ -466,6 +477,7 @@
         <p style="margin:0 0 8px" class="hidden" id="back-circuit-row"><button type="button" class="link" id="back-circuit">← Back</button></p>
         <div class="panel">
           <h2 style="margin:0" id="school-name"></h2>
+          <div class="meta" id="school-coordinators"></div>
           <p style="margin:0" class="hidden" id="rename-row"><button type="button" class="link" id="rename-open">Correct the school name</button></p>
           <div class="hidden" id="rename-box">
             <div class="field"><label for="rename-name">School name</label><input type="text" id="rename-name" maxlength="120" /></div>

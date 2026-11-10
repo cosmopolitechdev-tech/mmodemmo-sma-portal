@@ -68,6 +68,18 @@
   a.btn { text-align: center; line-height: 48px; text-decoration: none; }
   .btn[disabled] { opacity: .65; cursor: progress; }
   .btn.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+  /* Every button answers the pointer and shows a spinner while its action runs. */
+  button, .btn, .sbtn { transition: background-color .15s, color .15s, box-shadow .15s; }
+  .btn:hover:not([disabled]) { background: var(--primary); box-shadow: 0 2px 8px rgba(110, 23, 40, .25); }
+  .btn.secondary:hover:not([disabled]), .sbtn:hover:not([disabled]):not([aria-disabled="true"]) { background: #f6e3e7; color: var(--primary); }
+  .btn.danger:hover:not([disabled]) { background: #8f1c13; }
+  .tab:hover { color: var(--accent); background: #f8f1f2; }
+  .pw button:hover { text-decoration: underline; }
+  button.is-busy { cursor: progress; opacity: .8; }
+  button.is-busy::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+    border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin .7s linear infinite; }
+  @keyframes btn-spin { to { transform: rotate(360deg); } }
+  .inline-msg { margin: 8px 0 4px; flex-basis: 100%; }
   .alert { border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 15px; }
   .alert.error { background: var(--error-bg); color: var(--error); border-left: 4px solid var(--error); }
   .alert.ok { background: var(--ok-bg); color: var(--ok); }
@@ -115,7 +127,7 @@
               <button type="button" class="tab" role="tab" id="tab-coordinator" aria-controls="panel-coordinator" aria-selected="false">ICT Coordinator</button>
               <button type="button" class="tab" role="tab" id="tab-admin" aria-controls="panel-admin" aria-selected="false">Admin</button>
             </div>
-            <div id="message" class="hidden" role="alert"></div>
+            <div id="message" class="hidden" role="alert" data-banner></div>
 
             <form id="panel-teacher" role="tabpanel" aria-labelledby="tab-teacher" novalidate>
               <div class="field">
@@ -124,7 +136,7 @@
               </div>
               <div class="field">
                 <label for="t-pass">Password</label>
-                <div class="pw"><input type="password" id="t-pass" autocomplete="current-password" maxlength="128" required /><button type="button" class="show-pw" aria-controls="t-pass">Show</button></div>
+                <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="t-pass" autocomplete="current-password" maxlength="128" required /><button type="button" class="show-pw" aria-controls="t-pass">Show</button></div>
               </div>
               <button type="submit" class="btn">Sign in</button>
               <p class="hint" id="t-note">School ICT coordinators sign in here too: your school's page opens with your own record.</p>
@@ -132,7 +144,8 @@
 
             <form id="panel-coordinator" class="hidden" role="tabpanel" aria-labelledby="tab-coordinator" novalidate>
               <p class="hint" style="margin-top:0">For circuit ICT coordinators, to follow up the schools of their circuit. To fill in your own staff record, use the Teacher tab.</p>
-              <div class="field" id="c-circuit-field">
+              <!-- The portal finds the circuit from the Staff ID (owner, 2026-11-10): choosing the wrong one turned right passwords away. -->
+              <div class="field hidden" id="c-circuit-field">
                 <label for="c-circuit">Your circuit</label>
                 <select id="c-circuit"></select>
               </div>
@@ -142,7 +155,7 @@
               </div>
               <div class="field">
                 <label for="c-pass">Password <span class="hint">— the same as your teacher password</span></label>
-                <div class="pw"><input type="password" id="c-pass" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="c-pass">Show</button></div>
+                <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="c-pass" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="c-pass">Show</button></div>
               </div>
               <button type="submit" class="btn">Sign in</button>
             </form>
@@ -154,7 +167,7 @@
               </div>
               <div class="field">
                 <label for="a-pass">Password</label>
-                <div class="pw"><input type="password" id="a-pass" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="a-pass">Show</button></div>
+                <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="a-pass" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="a-pass">Show</button></div>
               </div>
               <button type="submit" class="btn">Sign in</button>
               <p class="foot"><button type="button" class="link" id="forgot">Forgot your password? Use your recovery key</button></p>
@@ -168,20 +181,20 @@
             <div class="field"><label for="r-user">Username</label><input type="text" id="r-user" autocapitalize="none" maxlength="40" /></div>
             <div class="field"><label for="r-key">Recovery key</label><input type="text" id="r-key" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
             <div class="field"><label for="r-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
-              <div class="pw"><input type="password" id="r-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="r-new">Show</button></div></div>
-            <div class="field"><label for="r-again">New password again</label><input type="password" id="r-again" autocomplete="new-password" maxlength="128" /></div>
+              <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="r-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="r-new">Show</button></div></div>
+            <div class="field"><label for="r-again">New password again</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="r-again" autocomplete="new-password" maxlength="128" /></div>
             <button type="submit" class="btn">Set my new password</button>
             <p class="foot"><button type="button" class="link" id="recover-back">Back to sign in</button></p>
           </form>
 
           <form id="accept" class="hidden" novalidate>
             <div class="alert warn">You are taking over as Main Admin. Enter the username and the code you were sent, then choose your own password.</div>
-            <div id="accept-message" class="hidden" role="alert"></div>
+            <div id="accept-message" class="hidden" role="alert" data-banner></div>
             <div class="field"><label for="h-user">Username</label><input type="text" id="h-user" autocapitalize="none" maxlength="40" /></div>
             <div class="field"><label for="h-code">Handover code</label><input type="text" id="h-code" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
             <div class="field"><label for="h-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
-              <div class="pw"><input type="password" id="h-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="h-new">Show</button></div></div>
-            <div class="field"><label for="h-again">New password again</label><input type="password" id="h-again" autocomplete="new-password" maxlength="128" /></div>
+              <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="h-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="h-new">Show</button></div></div>
+            <div class="field"><label for="h-again">New password again</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="h-again" autocomplete="new-password" maxlength="128" /></div>
             <button type="submit" class="btn">Become Main Admin</button>
             <p class="foot"><button type="button" class="link" id="accept-back">Back to sign in</button></p>
           </form>
@@ -196,18 +209,18 @@
 
           <form id="change" class="hidden" novalidate>
             <div class="alert warn">Please choose your own password before you continue.</div>
-            <div id="change-message" class="hidden" role="alert"></div>
+            <div id="change-message" class="hidden" role="alert" data-banner></div>
             <div class="field">
               <label for="n-current">Temporary or current password</label>
-              <div class="pw"><input type="password" id="n-current" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-current">Show</button></div>
+              <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="n-current" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-current">Show</button></div>
             </div>
             <div class="field">
               <label for="n-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
-              <div class="pw"><input type="password" id="n-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-new">Show</button></div>
+              <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="n-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-new">Show</button></div>
             </div>
             <div class="field">
               <label for="n-again">New password again</label>
-              <input type="password" id="n-again" autocomplete="new-password" maxlength="128" />
+              <input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="n-again" autocomplete="new-password" maxlength="128" />
             </div>
             <button type="submit" class="btn">Save my password</button>
           </form>

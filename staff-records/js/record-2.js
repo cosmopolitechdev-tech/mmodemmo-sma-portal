@@ -21,6 +21,11 @@
      through google.script.run; on our own domain (window.API_URL set, SPEC § 15) it is a fetch
      POST of {action, args} as text/plain, so the browser sends no CORS preflight. */
   function callServer_(name, args, onOk, onFail, onBusy, attempt) {
+    if (!attempt) {
+      var b = currentButton_(), release = markBusy_(b);
+      onOk = withButton_(b, release, onOk);
+      onFail = withButton_(b, release, onFail);
+    }
     attempt = attempt || 0;
     var retry = function (why) {
       if (attempt >= 5) { onFail({ code: "BUSY", message: "The system is very busy. Please try again in a few minutes." }); return; }
@@ -124,7 +129,9 @@
       else if (ev.key === "Tab") { ev.preventDefault(); (document.activeElement === yes ? no : yes).focus(); }
     };
     no.addEventListener("click", close);
-    yes.addEventListener("click", function () { close(); onYes(); });
+    // The answer belongs to the button that opened the dialog, not to the dialog's own button.
+    var opener = currentButton_();
+    yes.addEventListener("click", function () { close(); lastClick_ = opener ? { el: opener, at: Date.now() } : null; onYes(); });
     back.addEventListener("click", function (ev) { if (ev.target === back) close(); });
     document.addEventListener("keydown", keys, true);
     document.body.appendChild(back);
@@ -132,7 +139,79 @@
     (o.danger ? no : yes).focus(); // a risky action is never one Enter away
   }
 
+  /* ---- The button that started an action (owner, 2026-11-10): it shows a spinner while its call
+     runs, and the answer appears right under it instead of at the top of the page. Tabs and
+     the password Show buttons are not actions. */
+  var lastClick_ = null, handlerButton_ = null;
+  function actionButton_(node) {
+    var b = node && node.closest ? node.closest("button") : null;
+    if (!b || b.classList.contains("tab") || b.getAttribute("role") === "tab" || b.classList.contains("show-pw") || b.closest(".pw")) return null;
+    return b;
+  }
+  document.addEventListener("click", function (ev) {
+    var b = actionButton_(ev.target);
+    if (b && !b.closest(".dlg")) lastClick_ = { el: b, at: Date.now() };
+  }, true);
+  /* The button this moment belongs to: the one whose answer is being handled, or one just pressed. */
+  function currentButton_() {
+    if (handlerButton_ && document.body.contains(handlerButton_)) return handlerButton_;
+    return lastClick_ && Date.now() - lastClick_.at < 1500 && document.body.contains(lastClick_.el) ? lastClick_.el : null;
+  }
+  /* Shown on screen now (a button in a section the page has just hidden is not). */
+  function onScreen_(node) {
+    return !!node && document.body.contains(node) && node.getClientRects().length > 0;
+  }
+  function markBusy_(b) {
+    if (!b) return function () {};
+    b.busyCount_ = (b.busyCount_ || 0) + 1;
+    if (b.busyCount_ === 1) {
+      b.wasDisabled_ = b.disabled;
+      b.disabled = true;
+      b.classList.add("is-busy");
+      b.setAttribute("aria-busy", "true");
+    }
+    var done = false;
+    return function () {
+      if (done) return;
+      done = true;
+      b.busyCount_ -= 1;
+      if (b.busyCount_ > 0) return;
+      b.classList.remove("is-busy");
+      b.removeAttribute("aria-busy");
+      b.disabled = !!b.wasDisabled_;
+    };
+  }
+  /* Runs a page's answer handler with its button known, so its messages go under that button. */
+  function withButton_(b, release, fn) {
+    return function (x) {
+      release();
+      var before = handlerButton_;
+      handlerButton_ = b;
+      try { fn(x); } finally { handlerButton_ = before; }
+    };
+  }
+
+  /* Shows a message. A page banner (data-banner) gives way to a message under the button that
+     started the action; the banner is used when there is none, or when that button is gone.
+     Returns the element shown, for scrolling to it. */
   function showAlert_(node, kind, text) {
+    var b = node.hasAttribute("data-banner") ? currentButton_() : null;
+    if (b && !onScreen_(b)) b = null;
+    [].forEach.call(document.querySelectorAll(".inline-msg"), function (m) { if (m.parentNode) m.parentNode.removeChild(m); });
     node.className = "alert " + kind;
     node.textContent = text;
+    if (!b) return node;
+    node.classList.add("hidden");
+    var msg = document.createElement("div");
+    msg.className = "alert inline-msg " + kind;
+    msg.setAttribute("role", "alert");
+    msg.textContent = text;
+    b.parentNode.insertBefore(msg, b.nextSibling);
+    // A page that redraws the button's card, or moves to another view, right after would take the
+    // message out of sight with it: the banner shows it then.
+    setTimeout(function () {
+      if (!onScreen_(msg)) { node.classList.remove("hidden"); node.scrollIntoView({ block: "nearest" }); }
+      else msg.scrollIntoView({ block: "nearest" });
+    }, 0);
+    return msg;
   }

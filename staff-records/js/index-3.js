@@ -78,7 +78,7 @@ var $ = function (id) { return document.getElementById(id); };
           password = $("c-pass").value;
           call = "circuitCoordinatorLogin"; args = [$("c-circuit").value, $("c-staff").value, password];
         }
-        if (args.slice(-2).some(function (a) { return !String(a).trim(); }) || (call === "circuitCoordinatorLogin" && !args[0])) {
+        if (args.slice(-2).some(function (a) { return !String(a).trim(); })) {
           showAlert_($("message"), "error", "Please fill in every box.");
           return;
         }

@@ -400,8 +400,7 @@ var $ = function (id) { return document.getElementById(id); };
       /* ---- Server calls. */
       function fail(r) {
         if (r && (r.code === "SESSION_EXPIRED" || r.code === "MUST_CHANGE_PASSWORD")) { storeSet_("token", null); goToPage_("login"); return; }
-        showAlert_($("alert"), "error", (r && r.message) || "Something went wrong. Please try again.");
-        $("alert").scrollIntoView({ block: "center" });
+        showAlert_($("alert"), "error", (r && r.message) || "Something went wrong. Please try again.").scrollIntoView({ block: "center" });
       }
 
       function applyInit(r) {
@@ -702,6 +701,10 @@ var $ = function (id) { return document.getElementById(id); };
         var r = S.summary, c = r.counts;
         $("school-name").textContent = r.school.name || r.school.emis;
         $("rename-row").classList.toggle("hidden", !r.canRename);
+        var who = r.coordinators || {}, part = function (label, c) {
+          return label + ": " + (c ? (c.name || "Staff ID " + c.staffId) + (c.active ? "" : " (access off)") : "not named yet");
+        };
+        $("school-coordinators").textContent = S.schoolMode ? "" : part("School ICT coordinator", who.school) + " · " + part("Circuit coordinator", who.circuit);
         $("rename-box").classList.add("hidden");
         if (!S.admin) showWho(r.school.name, r.termLabel); // an admin's header stays on the district
         $("school-pct").textContent = r.pct + "%";
@@ -750,6 +753,9 @@ var $ = function (id) { return document.getElementById(id); };
           (t.serviceStatus !== "Active" ? " · not at post" + (t.serviceReason ? " (" + t.serviceReason + ")" : "") : "")));
         if (t.signIn !== "Active") li.appendChild(el("div", { "class": "meta warnline" }, t.signIn === "Inactive" ? "Sign-in switched off"
           : t.signIn === "Locked" ? "Sign-in locked by an admin" : "No sign-in account yet"));
+        if (t.staffId !== S.me && t.signIn !== "No account") {
+          li.appendChild(passwordBlock(t, !!S.summary.canResetPasswords, fullName(t)));
+        }
         if (t.missingSections.length) li.appendChild(el("div", { "class": "meta" }, "Missing: " + t.missingSections.map(titleWords).join(", ")));
         var when = t.updatedAt ? new Date(t.updatedAt) : null;
         li.appendChild(el("div", { "class": "meta" }, when && !isNaN(when.getTime())
@@ -764,11 +770,6 @@ var $ = function (id) { return document.getElementById(id); };
         var edit = el("button", { type: "button", "class": "sbtn" }, mine ? "My record" : S.summary.can.records ? "Edit record" : "View record");
         edit.addEventListener("click", function () { openRecord(mine ? null : t.staffId); });
         actions.appendChild(edit);
-        if (S.summary.canResetPasswords && !mine) {
-          var pw = el("button", { type: "button", "class": "sbtn" }, "Temporary password");
-          pw.addEventListener("click", function () { issueTemp(t); });
-          actions.appendChild(pw);
-        }
         li.appendChild(actions);
         if (S.summary.can.service) li.appendChild(serviceSelect(t));
         if (!mine && S.summary.can.access) li.appendChild(accessButtons(t, li));
@@ -777,7 +778,7 @@ var $ = function (id) { return document.getElementById(id); };
 
       /* Sign-in off/on and "left this school"; the server refuses what this person may not do. */
       function accessButtons(t, li) {
-        var more = el("div", { "class": "more" });
+        var more = el("div", { "class": "more manage" });
         if (t.signIn === "Active" || t.signIn === "Inactive") {
           var on = t.signIn !== "Active";
           var b = el("button", { type: "button", "class": "sbtn" }, on ? "Switch sign-in back on" : "Switch sign-in off");
@@ -847,6 +848,65 @@ var $ = function (id) { return document.getElementById(id); };
           }, function (e) { sel.disabled = false; sel.value = current; fail(e); });
         });
         return sel;
+      }
+
+      /* A person's password on their card (owner, 2026-11-10): "no password yet", or the temporary
+         password itself (with Copy and WhatsApp) until they choose their own, and a button to give
+         one when this viewer may. p is the person's own object from the page's data (staffId, phone,
+         password, tempPassword), changed in place so a redrawn list keeps the new password. */
+      function passwordBlock(p, mayGive, name) {
+        name = name || p.name || "";
+        var box = el("div", { "class": "pwblock" });
+        var line = el("div");
+        box.appendChild(line);
+        var actions = el("div", { "class": "more" });
+        var copy = el("button", { type: "button", "class": "sbtn" }, "Copy");
+        var wa = el("a", { "class": "sbtn wa", target: "_blank", rel: "noopener" }, "Send by WhatsApp");
+        var give = el("button", { type: "button", "class": "sbtn" });
+        var first = titleWords(String(name).split(" ")[0]);
+        var draw = function () {
+          while (line.firstChild) line.removeChild(line.firstChild);
+          var temp = p.tempPassword;
+          line.className = "pwline" + (p.password === "none" || p.password === "expired" ? " none" : "");
+          if (temp) {
+            line.appendChild(document.createTextNode("Temporary password: "));
+            line.appendChild(el("span", { "class": "key" }, temp));
+            line.appendChild(el("div", { "class": "hint" }, "Shown here until " + (first || "they") + " sign" + (first ? "s" : "") + " in and choose" + (first ? "s" : "") + " their own."));
+          } else {
+            line.textContent = p.password === "none" ? "No password yet: give a temporary password so they can sign in."
+              : p.password === "expired" ? "Their temporary password has expired: give a new one."
+              : p.password === "temp" ? "Has a temporary password (not shown to you)." : "Has chosen their own password.";
+          }
+          copy.classList.toggle("hidden", !temp);
+          var msg = temp ? "Hello " + first + ", your temporary password for the staff records portal is " + temp + " — sign in at " +
+            (portalLink() || "the portal") + " with your Staff ID (" + p.staffId + ") and this password, then choose your own password." : "";
+          var link = temp ? waShare(p.phone, msg) : "";
+          wa.classList.toggle("hidden", !link);
+          if (link) wa.href = link;
+          give.textContent = p.password === "none" ? "Give a temporary password" : "New temporary password";
+          give.classList.toggle("hidden", !mayGive);
+          actions.classList.toggle("hidden", !temp && !mayGive); // a viewer who can do nothing here sees the state only
+        };
+        copy.addEventListener("click", function () { copyText(p.tempPassword, copy); });
+        give.addEventListener("click", function () {
+          var go = function () {
+            callServer_("issueColleagueTempPassword", [S.token, p.staffId], function (r) {
+              if (!r || !r.ok) { fail(r); return; }
+              p.password = "temp";
+              p.tempPassword = r.temporaryPassword;
+              draw();
+              showAlert_($("alert"), "ok", "Temporary password for " + (name || "Staff ID " + p.staffId) + ": " + r.temporaryPassword + ". It stays on this card until they choose their own.");
+            }, fail);
+          };
+          if (p.password === "none") { go(); return; }
+          confirmBox_({ title: "New temporary password", message: ["Give ", { b: name || "Staff ID " + p.staffId }, " a new temporary password?"],
+            detail: "Their current password stops working at once and they are signed out on every device. The new one is shown on this card.",
+            ok: "Create the password" }, go);
+        });
+        [copy, wa, give].forEach(function (x) { actions.appendChild(x); });
+        box.appendChild(actions);
+        draw();
+        return box;
       }
 
       function issueTemp(t) {
@@ -1052,9 +1112,12 @@ var $ = function (id) { return document.getElementById(id); };
           actions.appendChild(wa);
         }
         li.appendChild(actions);
+        if (co && co.staffId !== S.me) {
+          li.appendChild(passwordBlock(co, !!(S.circuitSummary.can && S.circuitSummary.can.passwords)));
+        }
         if (!S.circuitSummary.canManage) return li;
-        if (co) li.appendChild(coordinatorStatusSelect(s));
-        var more = el("div", { "class": "more" });
+        if (co && (!S.circuitSummary.can || S.circuitSummary.can.access)) li.appendChild(coordinatorStatusSelect(s));
+        var more = el("div", { "class": "more manage" });
         var replace = el("button", { type: "button", "class": "sbtn" }, co ? "Replace School ICT Coordinator…" : "Name School ICT Coordinator…");
         replace.addEventListener("click", function () {
           pickerForm(li, "replace", {
@@ -1398,6 +1461,9 @@ var $ = function (id) { return document.getElementById(id); };
           actions.appendChild(wa);
         }
         li.appendChild(actions);
+        if (x.coordinator) {
+          li.appendChild(passwordBlock(x.coordinator, !!S.adminCan["teachers.passwords"]));
+        }
         if (!S.adminCan["coordinators.manage"]) return li;
         if (x.coordinator) {
           var sel = el("select", { "aria-label": "Access of the circuit coordinator of " + x.circuit });
@@ -1414,7 +1480,7 @@ var $ = function (id) { return document.getElementById(id); };
           });
           li.appendChild(sel);
         }
-        var more = el("div", { "class": "more" });
+        var more = el("div", { "class": "more manage" });
         var name = el("button", { type: "button", "class": "sbtn" }, x.coordinator ? "Replace circuit coordinator…" : "Name circuit coordinator…");
         name.addEventListener("click", function () {
           pickerForm(li, "circ", {
@@ -1448,6 +1514,9 @@ var $ = function (id) { return document.getElementById(id); };
           li.appendChild(el("div", { "class": "meta" + (s.coordinator ? "" : " warnline") }, s.coordinator
             ? "ICT coordinator: " + (s.coordinator.name || "Staff ID " + s.coordinator.staffId) + (s.coordinator.status !== "Active" ? " (" + s.coordinator.status.toLowerCase() + ")" : "")
             : "No ICT coordinator yet"));
+          if (s.coordinator) {
+            li.appendChild(passwordBlock(s.coordinator, !!S.adminCan["teachers.passwords"]));
+          }
           if (!s.pending) {
             li.appendChild(el("div", { "class": "meta" }, s.pct + "% complete · " + s.counts.active + " teacher" + (s.counts.active === 1 ? "" : "s") +
               " · complete " + s.counts.complete + ", partial " + s.counts.partial + ", not started " + s.counts.notStarted + (s.counts.notActive ? ", not at post " + s.counts.notActive : "")));
@@ -1538,7 +1607,7 @@ var $ = function (id) { return document.getElementById(id); };
           li.appendChild(sel);
         }
         if (can["teachers.import"] && !S.schoolMode) {
-          var more = el("div", { "class": "more" });
+          var more = el("div", { "class": "more manage" });
           var move = el("button", { type: "button", "class": "sbtn" }, "Transfer to another school…");
           move.addEventListener("click", function () { transferForm(t, li); });
           more.appendChild(move);
@@ -1587,7 +1656,7 @@ var $ = function (id) { return document.getElementById(id); };
       $("find-q").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); findTeachers(); } });
 
       /* ---- Admin Import tab: template → filled file → check → add, or one teacher from a form;
-         slips per school to print (or save as PDF). The server checks every row again. */
+         next steps for passwords. The server checks every row again. */
       var IMPORT_MAX_BYTES = 1000000;
 
       function openImport() {
@@ -1659,7 +1728,7 @@ var $ = function (id) { return document.getElementById(id); };
           b.disabled = false;
           b.textContent = was;
           if (r && r.code === "NO_CIRCUITS") { promptCircuits(r.message); return; }
-          if (r && r.code === "NO_DISTRICT_CODE") { showAlert_($("alert"), "error", r.message); window.scrollTo(0, 0); return; }
+          if (r && r.code === "NO_DISTRICT_CODE") { showAlert_($("alert"), "error", r.message).scrollIntoView({ block: "nearest" }); return; }
           if (!r || !r.ok) { fail(r); return; }
           saveBase64(r);
           showAlert_($("alert"), "ok", r.fileName + (r.circuits ? " — with " + r.circuits + " circuit" + (r.circuits === 1 ? "" : "s") + " in its drop-down." : ""));
@@ -1716,17 +1785,18 @@ var $ = function (id) { return document.getElementById(id); };
       }
 
       function importDone(r) {
-        S.imported = r;
-        renderSlips();
-        showAlert_($("alert"), "ok", r.added.length + " teacher" + (r.added.length === 1 ? " was" : "s were") + " added" +
-          (r.schoolsAdded ? ", with " + r.schoolsAdded + " new school" + (r.schoolsAdded === 1 ? "" : "s") : "") + ". Print the slips now: the passwords are shown only once.");
+        var text = r.added.length + " teacher" + (r.added.length === 1 ? " was" : "s were") + " added" +
+          (r.schoolsAdded ? ", with " + r.schoolsAdded + " new school" + (r.schoolsAdded === 1 ? "" : "s") : "") + ". Nobody has a password yet.";
+        showAlert_($("alert"), "ok", text);
+        $("import-next-text").textContent = text;
+        $("import-next").classList.remove("hidden");
       }
 
       function addImport() {
         if (!S.importFile) return;
         var n = S.importCount, who = n + " teacher" + (n === 1 ? "" : "s");
         confirmBox_({ title: "Add teachers to the portal", message: ["Add ", { b: who }, " to the portal?"],
-          detail: "Each one gets a temporary password. The next screen shows their password slips: print them or save them as PDF straight away, because the passwords are shown only once.",
+          detail: "Nobody gets a password now. Passwords are given one level at a time: you to the circuit coordinators, they to the school coordinators, and these to their teachers.",
           ok: "Yes, add " + who }, addImportNow);
       }
 
@@ -1770,40 +1840,6 @@ var $ = function (id) { return document.getElementById(id); };
         }, function (e) { $("one-add").disabled = false; fail(e); });
       }
 
-      /* One slip per teacher, grouped by school, for the coordinator to hand out. */
-      function renderSlips() {
-        var r = S.imported, box = $("slips");
-        while (box.firstChild) box.removeChild(box.firstChild);
-        var bySchool = {};
-        r.added.forEach(function (a) { var k = a.school || "No school yet (they choose it when they sign in)"; (bySchool[k] = bySchool[k] || []).push(a); });
-        Object.keys(bySchool).sort().forEach(function (school) {
-          var sec = el("section", { "class": "slip-school" });
-          sec.appendChild(el("h3", {}, school + " — " + bySchool[school].length + " slip" + (bySchool[school].length === 1 ? "" : "s")));
-          bySchool[school].forEach(function (a) {
-            var slip = el("div", { "class": "slip" });
-            slip.appendChild(el("strong", {}, a.name));
-            slip.appendChild(el("div", {}, "Staff ID: " + a.staffId + (a.school ? " · " + a.school : "")));
-            slip.appendChild(el("div", { "class": "key" }, a.temporaryPassword));
-            slip.appendChild(el("div", { "class": "hint" }, "Sign in at " + (shareLink(r.link) || "the staff records portal") + " (Teacher tab) with your Staff ID and this temporary password, then choose your own password. It works for " +
-              r.expiresInDays + " days."));
-            sec.appendChild(slip);
-          });
-          box.appendChild(sec);
-        });
-        $("slips-panel").classList.remove("hidden");
-      }
-
-      function csvCell(v) { return /[",\n]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v); }
-
-      function downloadSlips() {
-        var lines = [["Staff ID", "Name", "School", "Temporary password"].join(",")];
-        S.imported.added.forEach(function (a) { lines.push([a.staffId, a.name, a.school, a.temporaryPassword].map(csvCell).join(",")); });
-        var link = el("a", { download: "temporary-passwords.csv", href: URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv" })) });
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-
       $("tab-import").addEventListener("click", openImport);
       $("import-template").addEventListener("click", downloadTemplate);
       $("import-code-save").addEventListener("click", saveDistrictCode);
@@ -1812,18 +1848,7 @@ var $ = function (id) { return document.getElementById(id); };
       $("one-add").addEventListener("click", addOne);
       $("import-check").addEventListener("click", checkImport);
       $("import-add").addEventListener("click", addImport);
-      $("slips-print").addEventListener("click", function () { window.print(); });
-      $("slips-csv").addEventListener("click", downloadSlips);
-      $("slips-done").addEventListener("click", function () {
-        confirmBox_({ title: "Close the password slips?", message: "Have you printed or saved the slips?",
-          detail: "The temporary passwords cannot be shown again once you close this. If a slip is lost later, give that teacher a new temporary password.",
-          ok: "Yes, close the slips", cancel: "Not yet" }, function () {
-          S.imported = null;
-          var box = $("slips");
-          while (box.firstChild) box.removeChild(box.firstChild);
-          $("slips-panel").classList.add("hidden");
-        });
-      });
+      $("import-next-overview").addEventListener("click", function () { $("import-next").classList.add("hidden"); loadOverview(); });
 
       /* ---- Admins tab (Main Admin only) and adding schools / circuits (schools.manage). */
       var PERMISSION_LABELS = {
@@ -2028,7 +2053,7 @@ var $ = function (id) { return document.getElementById(id); };
           : "Leave it empty to send the Google (script.google.com) link.";
         $("set-MAINTENANCE_MODE").checked = v.MAINTENANCE_MODE === "true";
         $("set-MAINTENANCE_MESSAGE").value = v.MAINTENANCE_MESSAGE;
-        $("set-COORDINATOR_PASSWORD_RESETS").checked = v.COORDINATOR_PASSWORD_RESETS !== "false";
+        ["COORDINATOR_PASSWORD_RESETS", "COORDINATOR_SIGNIN_CONTROL", "CIRCUIT_PASSWORD_RESETS", "CIRCUIT_SIGNIN_CONTROL"].forEach(function (k) { $("set-" + k).checked = v[k] !== "false"; });
         ["TEMP_PASSWORD_DAYS", "SESSION_IDLE_MINUTES", "SESSION_MAX_HOURS"].forEach(function (k) { $("set-" + k).value = v[k]; });
         var waves = $("set-waves"), open = v.ALLOWED_CIRCUITS ? v.ALLOWED_CIRCUITS.split(",") : [];
         while (waves.firstChild) waves.removeChild(waves.firstChild);
@@ -2067,7 +2092,8 @@ var $ = function (id) { return document.getElementById(id); };
         var out = {
           REGION: $("set-REGION").value, MMDA: $("set-MMDA").value, DISTRICT_CODE: $("set-DISTRICT_CODE").value.trim(), ACADEMIC_YEAR: $("set-ACADEMIC_YEAR").value, TERM: $("set-TERM").value, REMINDER_MESSAGE: $("set-REMINDER_MESSAGE").value, PORTAL_LINK: $("set-PORTAL_LINK").value.trim(),
           MAINTENANCE_MODE: String($("set-MAINTENANCE_MODE").checked), MAINTENANCE_MESSAGE: $("set-MAINTENANCE_MESSAGE").value,
-          COORDINATOR_PASSWORD_RESETS: String($("set-COORDINATOR_PASSWORD_RESETS").checked), ALLOWED_CIRCUITS: ticked($("set-waves")).join(","),
+          COORDINATOR_PASSWORD_RESETS: String($("set-COORDINATOR_PASSWORD_RESETS").checked), COORDINATOR_SIGNIN_CONTROL: String($("set-COORDINATOR_SIGNIN_CONTROL").checked),
+          CIRCUIT_PASSWORD_RESETS: String($("set-CIRCUIT_PASSWORD_RESETS").checked), CIRCUIT_SIGNIN_CONTROL: String($("set-CIRCUIT_SIGNIN_CONTROL").checked), ALLOWED_CIRCUITS: ticked($("set-waves")).join(","),
           REQUIRED_FIELDS: $("set-req-template").checked ? "" : ticked($("set-required")).join(",")
         };
         ["TEMP_PASSWORD_DAYS", "SESSION_IDLE_MINUTES", "SESSION_MAX_HOURS"].forEach(function (k) { out[k] = $("set-" + k).value; });
@@ -2111,10 +2137,12 @@ var $ = function (id) { return document.getElementById(id); };
       $("set-save").addEventListener("click", function () {
         [].forEach.call(document.querySelectorAll("#settings-view .err[id^=e-set-]"), function (x) { x.textContent = ""; });
         callServer_("saveSettings", [S.token, collectSettings()], function (r) {
-          if (r && r.ok) { showAlert_($("alert"), "ok", "Settings saved."); loadSettings(); window.scrollTo(0, 0); return; }
+          if (r && r.ok) { showAlert_($("alert"), "ok", "Settings saved."); loadSettings(); return; }
           if (r && r.errors) Object.keys(r.errors).forEach(function (k) { if ($("e-set-" + k)) $("e-set-" + k).textContent = r.errors[k]; });
-          showAlert_($("alert"), "error", (r && r.message) || "Could not save.");
-          window.scrollTo(0, 0);
+          var shown = showAlert_($("alert"), "error", (r && r.message) || "Could not save.");
+          // The first box with a mistake, so it is seen; the summary stays under the button.
+          var firstBad = [].filter.call(document.querySelectorAll("#settings-view .err[id^=e-set-]"), function (x) { return x.textContent; })[0];
+          (firstBad || shown).scrollIntoView({ block: "center" });
         }, fail);
       });
       $("tab-admins").addEventListener("click", loadAdmins);
