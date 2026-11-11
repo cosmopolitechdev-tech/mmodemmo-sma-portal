@@ -618,10 +618,11 @@ var $ = function (id) { return document.getElementById(id); };
         $("back-overview-row").classList.toggle("hidden", !(S.admin && view === "circuit"));
         $("record-view").classList.toggle("hidden", view !== "record");
         $("savebar").classList.toggle("hidden", view !== "record" || $("record").classList.contains("hidden"));
-        $("tab-school").setAttribute("aria-selected", String(view === "school" && !S.circuitRole));
+        var ownSchool = view === "school" && S.circuitRole && !!S.mySchool && S.schoolEmis === S.mySchool;
+        $("tab-school").setAttribute("aria-selected", String(view === "school" && (!S.circuitRole || ownSchool)));
         $("tab-record").setAttribute("aria-selected", String(view === "record" && !S.subject));
         $("top-title").textContent = view === "audit" ? "Audit log" : view === "settings" ? "Settings" : view === "admins" ? "Admins" : view === "import" ? "Import teachers" : view === "teachers" ? "Teachers" : view === "overview" ? "Overview" : view === "setup" ? "Set up your school" : view === "circuit" ? (S.admin ? "Circuit" : "My Circuit")
-          : view === "school" ? ((S.circuitRole || S.admin) && !S.schoolMode ? "School" : "My School")
+          : view === "school" ? ((S.circuitRole || S.admin) && !S.schoolMode && !ownSchool ? "School" : "My School")
           : S.subject ? "Colleague's record" : "My staff record";
         window.scrollTo(0, 0);
       }
@@ -707,6 +708,7 @@ var $ = function (id) { return document.getElementById(id); };
         $("school-coordinators").textContent = S.schoolMode ? "" : part("School ICT coordinator", who.school) + " · " + part("Circuit coordinator", who.circuit);
         $("rename-box").classList.add("hidden");
         if (!S.admin) showWho(r.school.name, r.termLabel); // an admin's header stays on the district
+        renderStats($("school-stats"), [["Teachers in the school", c.total], ["Complete", c.complete], ["Not finished", c.partial + c.notStarted + c.needsConfirming]]);
         $("school-pct").textContent = r.pct + "%";
         $("school-bar").style.width = r.pct + "%";
         $("school-pct-text").textContent = "of " + c.active + " teacher" + (c.active === 1 ? "" : "s") + " complete · average " + r.averagePct + "%";
@@ -1042,6 +1044,11 @@ var $ = function (id) { return document.getElementById(id); };
         var r = S.circuitSummary, c = r.counts;
         $("circuit-name").textContent = r.circuit + " circuit";
         if (!S.admin) showWho(r.circuit + " circuit", r.termLabel);
+        if (S.circuitRole) {
+          // The circuit coordinator who also runs their own school reaches it from its own tab.
+          if ("mySchool" in r) S.mySchool = r.mySchool || "";
+          $("tab-school").classList.toggle("hidden", !S.mySchool);
+        }
         // Admins name circuit coordinators on the Overview and school coordinators in each school's
         // card; a circuit coordinator also names the coordinator of a school not listed yet here.
         $("name-panel").classList.toggle("hidden", !r.canManage || !!S.admin);
@@ -1055,6 +1062,7 @@ var $ = function (id) { return document.getElementById(id); };
           cx.appendChild(exportButton("Download the circuit's staff list", { kind: "circuit", circuit: r.circuit }));
           cx.appendChild(exportButton("Staff list (CSV)", { kind: "circuit", circuit: r.circuit }, true));
         }
+        renderStats($("circuit-stats"), [["Teachers in the circuit", c.total], ["Schools", r.schools.filter(function (s) { return !s.pending; }).length]]);
         $("circuit-pct").textContent = r.pct + "%";
         $("circuit-bar").style.width = r.pct + "%";
         $("circuit-pct-text").textContent = "of " + c.active + " teacher" + (c.active === 1 ? "" : "s") + " complete · average " + r.averagePct + "% · " + r.schools.length + " school" + (r.schools.length === 1 ? "" : "s");
@@ -1177,7 +1185,22 @@ var $ = function (id) { return document.getElementById(id); };
          the admin types. o: {id, scope, showSchool, notFound(id), lazy}. check() returns a message or "". */
       function staffPicker(box, o) {
         var list = null;
-        box.appendChild(el("label", { "for": o.id + "-q" }, "1. Search by name"));
+        if (o.suggest && o.suggest.length) {
+          // Usually one of these people (owner, 2026-11-11): one tap fills the Staff ID.
+          box.appendChild(el("p", { "class": "hint", style: "margin:8px 0 0" }, o.suggest.title));
+          var quick = el("ul", { "class": "picks", id: o.id + "-suggest" });
+          o.suggest.forEach(function (p) {
+            var b = el("button", { type: "button", "class": "sbtn" }, p.name + " — " + p.school);
+            b.addEventListener("click", function () {
+              input.value = p.id;
+              picked.className = "picked";
+              picked.textContent = "Chosen: " + p.name + " — " + p.school;
+            });
+            quick.appendChild(el("li")).appendChild(b);
+          });
+          box.appendChild(quick);
+        }
+        box.appendChild(el("label", { "for": o.id + "-q" }, (o.suggest && o.suggest.length ? "Or 1. " : "1. ") + "Search by name"));
         var q = el("input", { type: "text", id: o.id + "-q", maxlength: "60", autocomplete: "off", autocapitalize: "characters", placeholder: "Type part of the name, e.g. MENSAH" });
         upperInput(q);
         box.appendChild(q);
@@ -1252,7 +1275,7 @@ var $ = function (id) { return document.getElementById(id); };
         if (old) li.removeChild(old);
         var box = el("div", { "class": "leave", "data-kind": kind });
         box.appendChild(el("p", { "class": "hint", style: "margin:0" }, o.intro));
-        var picker = staffPicker(box, { id: kind + "-" + li.id, scope: o.scope, showSchool: o.showSchool, notFound: o.notFound });
+        var picker = staffPicker(box, { id: kind + "-" + li.id, scope: o.scope, showSchool: o.showSchool, notFound: o.notFound, suggest: o.suggest });
         var err = el("div", { "class": "err", role: "alert" });
         box.appendChild(err);
         var row = el("div", { "class": "more" });
@@ -1297,7 +1320,7 @@ var $ = function (id) { return document.getElementById(id); };
         var name = s.coordinator && s.coordinator.name ? titleWords(s.coordinator.name.split(" ")[0]) : "";
         var link = shareLink(S.circuitSummary.link);
         if (s.pending) return "Hello " + name + ", please sign in to the staff records portal at " + (link || "the portal") +
-          " (Teacher tab, your Staff ID and password) and enter your school's EMIS code and name.";
+          " (Teacher / School ICT tab, your Staff ID and password) and enter your school's EMIS code and name.";
         return "Hello " + name + ", " + s.name + " is " + s.pct + "% complete on the staff records portal. Please remind the teachers who have not finished. " + link;
       }
 
@@ -1328,7 +1351,7 @@ var $ = function (id) { return document.getElementById(id); };
           if (!r || !r.ok) { $("e-name").textContent = (r && r.message) || "Could not name the coordinator."; return; }
           $("name-id").value = "";
           $("name-id-who").textContent = "";
-          showAlert_($("alert"), "ok", r.name + (r.needsSetup ? " is named. They now sign in on the Teacher tab and enter their school's EMIS code and name." : " is now the ICT coordinator of their school."));
+          showAlert_($("alert"), "ok", r.name + (r.needsSetup ? " is named. They now sign in on the Teacher / School ICT tab and enter their school's EMIS code and name." : " is now the ICT coordinator of their school."));
           loadCircuit();
         }, function (e) { $("name-save").disabled = false; fail(e); });
       });
@@ -1385,6 +1408,7 @@ var $ = function (id) { return document.getElementById(id); };
           $("tab-settings").classList.toggle("hidden", !r.can["settings"]);
           $("tab-audit").classList.toggle("hidden", !r.can["audit.view"]);
           $("schools-add").classList.toggle("hidden", !r.can["schools.manage"]);
+          $("circuit-add").classList.toggle("hidden", !r.can["schools.manage"]);
           if (r.school) {
             // One school (SPEC § 15): its own screen is the home, with the coordinators' tools for the admin.
             S.schoolMode = true;
@@ -1398,8 +1422,20 @@ var $ = function (id) { return document.getElementById(id); };
         }, fail);
       }
 
+      /* Big totals at the top of the district, circuit and school pages (owner, 2026-11-11). */
+      function renderStats(ul, items) {
+        while (ul.firstChild) ul.removeChild(ul.firstChild);
+        items.forEach(function (x) {
+          var li = el("li");
+          li.appendChild(el("b", {}, String(x[1])));
+          li.appendChild(document.createTextNode(x[0]));
+          ul.appendChild(li);
+        });
+      }
+
       function renderOverview() {
         var r = S.overview, c = r.counts;
+        renderStats($("district-stats"), [["Teachers in the district", c.total], ["Schools", r.schools.filter(function (s) { return !s.pending; }).length], ["Circuits", r.circuits.length]]);
         showWho((r.district.name || r.district.mmda || "District") + (r.main ? " · Main Admin" : " · Admin"), r.termLabel);
         $("district-name").textContent = r.district.mmda || "District";
         $("district-pct").textContent = r.pct + "%";
@@ -1427,6 +1463,11 @@ var $ = function (id) { return document.getElementById(id); };
         sel.appendChild(el("option", { value: "" }, "All circuits"));
         r.circuits.forEach(function (x) { sel.appendChild(el("option", { value: x.circuit }, x.circuit)); });
         sel.value = keep;
+        var pick = $("new-school-circuit"), chosen = pick.value;
+        while (pick.firstChild) pick.removeChild(pick.firstChild);
+        pick.appendChild(el("option", { value: "" }, "Choose the school's circuit…"));
+        r.circuits.forEach(function (x) { pick.appendChild(el("option", { value: x.circuit }, x.circuit)); });
+        pick.value = chosen;
         renderDistrictSchools();
       }
 
@@ -1485,13 +1526,22 @@ var $ = function (id) { return document.getElementById(id); };
         name.addEventListener("click", function () {
           pickerForm(li, "circ", {
             intro: "Choose the circuit ICT coordinator of " + x.circuit + " circuit: search their name, or type their Staff ID. Any teacher of a school in this circuit can be chosen.",
-            scope: { circuit: x.circuit }, showSchool: true,
+            scope: { circuit: x.circuit }, showSchool: true, suggest: circuitSuggestions(x.circuit),
             notFound: function (id) { return "Staff ID " + id + " is not a teacher of a school in " + x.circuit + " circuit. Search by name above, or check the number."; }
           }, function (id, done) { callServer_("setCircuitCoordinator", [S.token, x.circuit, id], done, fail); }, loadOverview);
         });
         more.appendChild(name);
         li.appendChild(more);
         return li;
+      }
+
+      /* The circuit's School ICT Coordinators, offered first when naming its circuit coordinator:
+         most often one of them takes the circuit too (owner, 2026-11-11). */
+      function circuitSuggestions(circuit) {
+        var list = ((S.overview && S.overview.schools) || []).filter(function (s) { return s.circuit === circuit && !s.pending && s.coordinator; })
+          .map(function (s) { return { id: s.coordinator.staffId, name: s.coordinator.name || "Staff ID " + s.coordinator.staffId, school: "ICT coordinator of " + s.name }; });
+        list.title = "The School ICT Coordinators of " + circuit + " circuit (tap one to choose them):";
+        return list;
       }
 
       function renderDistrictSchools() {
@@ -2171,21 +2221,50 @@ var $ = function (id) { return document.getElementById(id); };
           else fail(r);
         }, fail);
       });
-      $("add-circuit").addEventListener("click", function () {
-        callServer_("addCircuit", [S.token, $("new-circuit").value], function (r) {
-          if (!r || !r.ok) { $("e-schools-add").textContent = (r && r.message) || "Could not add."; return; }
-          $("new-circuit").value = "";
-          showAlert_($("alert"), "ok", r.circuit + " circuit was added.");
+      /* Same comparison as the server's: no district code in front, no case, spaces or punctuation. */
+      function schoolKey(name) { return String(name || "").toLowerCase().replace(/^\d+[\s-]*/, "").replace(/[^a-z0-9]/g, ""); }
+      function newSchoolClash() {
+        var emis = $("new-school-emis").value.replace(/\s+/g, ""), key = schoolKey($("new-school-name").value);
+        var all = (S.overview && S.overview.schools) || [];
+        var byCode = emis && all.filter(function (s) { return s.emis === emis; })[0];
+        var byName = key && all.filter(function (s) { return !s.pending && schoolKey(s.name) === key; })[0];
+        $("e-new-school-emis").textContent = byCode ? "Another school already has this EMIS code (" + byCode.name + ")." : "";
+        $("e-new-school-name").textContent = byName ? "There is already a school called " + byName.name + " (EMIS " + byName.emis + ", " + byName.circuit + " circuit). Check the name." : "";
+        return !!(byCode || byName);
+      }
+      ["new-school-emis", "new-school-name"].forEach(function (id) { $(id).addEventListener("input", newSchoolClash); });
+      $("new-school-circuit").addEventListener("change", function () { $("e-new-school-circuit").textContent = ""; });
+      $("add-school").addEventListener("click", function () {
+        ["emis", "name", "circuit"].forEach(function (k) { $("e-new-school-" + k).textContent = ""; });
+        var form = { emis: $("new-school-emis").value, name: $("new-school-name").value, circuit: $("new-school-circuit").value };
+        var missing = newSchoolClash();
+        if (!form.emis.trim()) { $("e-new-school-emis").textContent = "Type the school's EMIS code."; missing = true; }
+        if (!form.name.trim()) { $("e-new-school-name").textContent = "Type the school's name."; missing = true; }
+        if (!form.circuit) { $("e-new-school-circuit").textContent = "Choose the school's circuit."; missing = true; }
+        if (missing) return;
+        callServer_("addSchools", [S.token, form], function (r) {
+          if (r && r.code === "INVALID" && r.errors) {
+            Object.keys(r.errors).forEach(function (k) { if ($("e-new-school-" + k)) $("e-new-school-" + k).textContent = r.errors[k]; });
+            return;
+          }
+          if (!r || !r.ok) { fail(r); return; }
+          ["new-school-emis", "new-school-name"].forEach(function (id) { $(id).value = ""; });
+          showAlert_($("alert"), "ok", form.name.trim() + " was added to " + form.circuit + " circuit. Name its School ICT Coordinator on its card below.");
           loadOverview();
         }, fail);
       });
-      $("add-schools").addEventListener("click", function () {
-        $("e-schools-add").textContent = "";
-        callServer_("addSchools", [S.token, $("new-schools").value], function (r) {
-          if (r && r.problems && r.problems.length) $("e-schools-add").textContent = r.problems.join(" · ");
-          if (!r || !r.ok) { if (!(r && r.problems)) fail(r); return; }
-          $("new-schools").value = "";
-          showAlert_($("alert"), "ok", r.added.length + " school" + (r.added.length === 1 ? " was" : "s were") + " added.");
+      $("new-circuit").addEventListener("input", function () {
+        var v = $("new-circuit").value.trim().toLowerCase();
+        var same = v && ((S.overview && S.overview.circuits) || []).filter(function (x) { return x.circuit.toLowerCase() === v; })[0];
+        $("e-new-circuit").textContent = same ? "There is already a circuit called " + same.circuit + "." : "";
+      });
+      $("add-circuit").addEventListener("click", function () {
+        $("e-new-circuit").textContent = "";
+        callServer_("addCircuit", [S.token, $("new-circuit").value], function (r) {
+          if (r && r.code === "INVALID") { $("e-new-circuit").textContent = r.message; return; }
+          if (!r || !r.ok) { fail(r); return; }
+          $("new-circuit").value = "";
+          showAlert_($("alert"), "ok", r.circuit + " circuit was added. You can now add its schools under Schools, and name its circuit ICT coordinator on its card.");
           loadOverview();
         }, fail);
       });
@@ -2196,7 +2275,11 @@ var $ = function (id) { return document.getElementById(id); };
       $("school-circuit-filter").addEventListener("change", renderDistrictSchools);
       $("school-sort").addEventListener("change", renderDistrictSchools);
 
-      $("tab-school").addEventListener("click", function () { S.subject = null; loadSchool(); });
+      $("tab-school").addEventListener("click", function () {
+        S.subject = null;
+        if (S.circuitRole) S.schoolEmis = S.mySchool;
+        loadSchool();
+      });
       $("tab-record").addEventListener("click", function () { openRecord(null); });
       $("editing-back").addEventListener("click", function () {
         S.subject = null;

@@ -137,8 +137,8 @@
 
           <section id="signin">
             <div class="tabs" role="tablist" aria-label="Sign in as">
-              <button type="button" class="tab" role="tab" id="tab-teacher" aria-controls="panel-teacher" aria-selected="true">Teacher</button>
-              <button type="button" class="tab" role="tab" id="tab-coordinator" aria-controls="panel-coordinator" aria-selected="false">ICT Coordinator</button>
+              <button type="button" class="tab" role="tab" id="tab-teacher" aria-controls="panel-teacher" aria-selected="true">Teacher / School ICT</button>
+              <button type="button" class="tab" role="tab" id="tab-coordinator" aria-controls="panel-coordinator" aria-selected="false">Circuit ICT</button>
               <button type="button" class="tab" role="tab" id="tab-admin" aria-controls="panel-admin" aria-selected="false">Admin</button>
             </div>
             <div id="message" class="hidden" role="alert" data-banner></div>
@@ -157,7 +157,7 @@
             </form>
 
             <form id="panel-coordinator" class="hidden" role="tabpanel" aria-labelledby="tab-coordinator" novalidate>
-              <p class="hint" style="margin-top:0">For circuit ICT coordinators, to follow up the schools of their circuit. To fill in your own staff record, use the Teacher tab.</p>
+              <p class="hint" style="margin-top:0">For circuit ICT coordinators, to follow up the schools of their circuit. School ICT coordinators and teachers: use the Teacher / School ICT tab.</p>
               <!-- The portal finds the circuit from the Staff ID (owner, 2026-11-10): choosing the wrong one turned right passwords away. -->
               <div class="field hidden" id="c-circuit-field">
                 <label for="c-circuit">Your circuit</label>
@@ -194,7 +194,7 @@
             <div id="recover-message" class="hidden" role="alert"></div>
             <div class="field"><label for="r-user">Username</label><input type="text" id="r-user" autocapitalize="none" maxlength="40" /></div>
             <div class="field"><label for="r-key">Recovery key</label><input type="text" id="r-key" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
-            <div class="field"><label for="r-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
+            <div class="field"><label for="r-new">New password <span class="hint">— 8+ characters with a capital, a small letter, a number and a symbol (! # $ %)</span></label>
               <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="r-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="r-new">Show</button></div></div>
             <div class="field"><label for="r-again">New password again</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="r-again" autocomplete="new-password" maxlength="128" /></div>
             <button type="submit" class="btn">Set my new password</button>
@@ -206,7 +206,7 @@
             <div id="accept-message" class="hidden" role="alert" data-banner></div>
             <div class="field"><label for="h-user">Username</label><input type="text" id="h-user" autocapitalize="none" maxlength="40" /></div>
             <div class="field"><label for="h-code">Handover code</label><input type="text" id="h-code" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
-            <div class="field"><label for="h-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
+            <div class="field"><label for="h-new">New password <span class="hint">— 8+ characters with a capital, a small letter, a number and a symbol (! # $ %)</span></label>
               <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="h-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="h-new">Show</button></div></div>
             <div class="field"><label for="h-again">New password again</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="h-again" autocomplete="new-password" maxlength="128" /></div>
             <button type="submit" class="btn">Become Main Admin</button>
@@ -229,7 +229,7 @@
               <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="n-current" autocomplete="current-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-current">Show</button></div>
             </div>
             <div class="field">
-              <label for="n-new">New password <span class="hint">— 8+ characters, letters and numbers</span></label>
+              <label for="n-new">New password <span class="hint">— 8+ characters with a capital, a small letter, a number and a symbol (! # $ %)</span></label>
               <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="n-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="n-new">Show</button></div>
             </div>
             <div class="field">

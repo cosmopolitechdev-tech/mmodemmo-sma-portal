@@ -124,6 +124,7 @@ var $ = function (id) { return document.getElementById(id); };
           sel.appendChild(o);
         });
         $("tab-coordinator").classList.toggle("hidden", c.mode === "school"); // one school: admins and teachers only
+        if (c.mode === "school") $("tab-teacher").textContent = "Teacher";
         $("t-note").classList.toggle("hidden", c.mode === "school");
         selectTab("teacher");
       }

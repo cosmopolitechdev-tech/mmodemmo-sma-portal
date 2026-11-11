@@ -190,6 +190,9 @@
       .toolbar select { width: auto; flex: 1; min-width: 160px; }
       .counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
       .counts li { background: #f4efe6; border-radius: 14px; padding: 4px 10px; }
+      .stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; padding: 0; list-style: none; }
+      .stats li { background: #f4efe6; border-radius: 10px; padding: 6px 12px; min-width: 88px; font-size: 13px; }
+      .stats b { display: block; font-size: 22px; line-height: 1.2; }
       textarea.msgbox { min-height: 160px; margin-top: 10px; font-size: 14px; }
       .slip-school h3 { font-size: 16px; margin: 16px 0 8px; }
       /* A person's sign-in on a card: the temporary password stays here until they choose their own. */
@@ -410,8 +413,8 @@
           <p id="import-next-text"></p>
           <ol class="steps">
             <li>On <strong>Overview</strong>, name each circuit's ICT coordinator and press <strong>Give a temporary password</strong> on their card. It stays on the card until they choose their own.</li>
-            <li>Each circuit coordinator signs in (ICT Coordinator tab), names a School ICT Coordinator for every school and gives them a temporary password the same way.</li>
-            <li>Each School ICT Coordinator signs in (Teacher tab) and gives their teachers temporary passwords from their school's page.</li>
+            <li>Each circuit coordinator signs in (Circuit ICT tab), names a School ICT Coordinator for every school and gives them a temporary password the same way.</li>
+            <li>Each School ICT Coordinator signs in (Teacher / School ICT tab) and gives their teachers temporary passwords from their school's page.</li>
           </ol>
           <button type="button" class="sbtn" id="import-next-overview">Go to the Overview</button>
         </div>
@@ -431,22 +434,29 @@
         <div id="district-warnings"></div>
         <div class="panel">
           <h2 style="margin:0" id="district-name"></h2>
+          <ul class="stats" id="district-stats" aria-label="Totals"></ul>
           <div><span class="pct" id="district-pct">0%</span> <span class="hint" id="district-pct-text"></span></div>
           <div class="bar" aria-hidden="true"><span id="district-bar"></span></div>
           <ul class="counts" id="district-counts"></ul>
           <div class="more" id="district-export"></div>
         </div>
         <h2 style="font-size:18px">Circuits</h2>
+        <details class="panel hidden" id="circuit-add">
+          <summary style="font-weight:700">Add a new circuit</summary>
+          <p class="hint">Only for a circuit the district does not have yet. This adds the circuit itself, not a school: to add a school to a circuit, use <strong>Add a school</strong> under Schools below and choose its circuit there.</p>
+          <div class="field"><label for="new-circuit">Name of the new circuit</label><input type="text" id="new-circuit" maxlength="60" autocomplete="off" placeholder="e.g. Abuakwa" /></div>
+          <div class="err" id="e-new-circuit" role="alert"></div>
+          <button type="button" class="sbtn" id="add-circuit">Add the circuit</button>
+        </details>
         <ul class="cards" id="circuit-list"></ul>
         <h2 style="font-size:18px">Schools</h2>
         <details class="panel hidden" id="schools-add">
-          <summary style="font-weight:700">Add schools or a circuit</summary>
-          <p class="hint">Schools are normally entered by their own ICT coordinators. Here you can paste a list: School EMIS Code, school name, circuit.</p>
-          <div class="field"><label for="new-schools">Schools</label><textarea id="new-schools" spellcheck="false"></textarea></div>
-          <button type="button" class="sbtn" id="add-schools">Add schools</button>
-          <div class="field" style="margin-top:12px"><label for="new-circuit">New circuit</label><input type="text" id="new-circuit" maxlength="60" /></div>
-          <button type="button" class="sbtn" id="add-circuit">Add circuit</button>
-          <div class="err" id="e-schools-add" role="alert"></div>
+          <summary style="font-weight:700">Add a school</summary>
+          <p class="hint">Schools usually arrive with the import file, or are set up by their own ICT coordinator. Use this form for one school at a time. Its circuit must already be listed under Circuits above; if it is not, add the circuit first.</p>
+          <div class="field"><label for="new-school-emis">School EMIS Code</label><input type="text" id="new-school-emis" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="e.g. 1066110031" /><div class="err" id="e-new-school-emis" role="alert"></div></div>
+          <div class="field"><label for="new-school-name">School name</label><input type="text" id="new-school-name" maxlength="120" autocomplete="off" placeholder="e.g. Kokoben D/A JHS" /><div class="err" id="e-new-school-name" role="alert"></div></div>
+          <div class="field"><label for="new-school-circuit">Circuit of this school</label><select id="new-school-circuit"></select><div class="err" id="e-new-school-circuit" role="alert"></div></div>
+          <button type="button" class="sbtn" id="add-school">Add the school</button>
         </details>
         <div class="toolbar">
           <select id="school-circuit-filter" aria-label="Circuit"></select>
@@ -462,6 +472,7 @@
         <p style="margin:0 0 8px" class="hidden" id="back-overview-row"><button type="button" class="link" id="back-overview">← Back to the overview</button></p>
         <div class="panel">
           <h2 style="margin:0" id="circuit-name"></h2>
+          <ul class="stats" id="circuit-stats" aria-label="Totals"></ul>
           <div><span class="pct" id="circuit-pct">0%</span> <span class="hint" id="circuit-pct-text"></span></div>
           <div class="bar" aria-hidden="true"><span id="circuit-bar"></span></div>
           <p style="margin:12px 0 0"><button type="button" class="btn secondary" id="circuit-msg">Copy circuit message for WhatsApp</button></p>
@@ -470,7 +481,7 @@
         </div>
         <div class="panel hidden" id="name-panel">
           <h2 style="margin-top:0;font-size:18px">A school that is not on the list yet</h2>
-          <p class="hint">Choose the teacher who will be its ICT coordinator. They then sign in on the Teacher tab and type the school's EMIS code and name. For a school already listed below, use that school's own "Name School ICT Coordinator" button.</p>
+          <p class="hint">Choose the teacher who will be its ICT coordinator. They then sign in on the Teacher / School ICT tab and type the school's EMIS code and name. For a school already listed below, use that school's own "Name School ICT Coordinator" button.</p>
           <div id="name-picker"></div>
           <div class="err" id="e-name" role="alert"></div>
           <button type="button" class="btn" id="name-save">Name School ICT Coordinator</button>
@@ -498,6 +509,7 @@
             <div class="err" id="e-rename" role="alert"></div>
             <div style="display:flex;gap:8px"><button type="button" class="sbtn" id="rename-save">Save the name</button><button type="button" class="sbtn" id="rename-cancel">Cancel</button></div>
           </div>
+          <ul class="stats" id="school-stats" aria-label="Totals"></ul>
           <div><span class="pct" id="school-pct">0%</span> <span class="hint" id="school-pct-text"></span></div>
           <div class="bar" aria-hidden="true"><span id="school-bar"></span></div>
           <ul class="counts" id="school-counts"></ul>
