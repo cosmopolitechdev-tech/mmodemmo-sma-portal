@@ -446,21 +446,21 @@
         <h2 style="font-size:18px">Circuits</h2>
         <details class="panel hidden" id="circuit-add">
           <summary style="font-weight:700">Add a new circuit</summary>
-          <p class="hint">Only for a circuit the district does not have yet. This adds the circuit itself, not a school: to add a school to a circuit, use <strong>Add a school</strong> under Schools below and choose its circuit there.</p>
+          <p class="hint">Only for a circuit the district does not have yet. This adds the circuit itself, not a school: to add a school to a circuit, use <strong>Add a school</strong> just below and choose its circuit there.</p>
           <div class="field"><label for="new-circuit">Name of the new circuit</label><input type="text" id="new-circuit" maxlength="60" autocomplete="off" placeholder="e.g. Abuakwa" /></div>
           <div class="err" id="e-new-circuit" role="alert"></div>
           <button type="button" class="sbtn" id="add-circuit">Add the circuit</button>
         </details>
-        <ul class="cards" id="circuit-list"></ul>
-        <h2 style="font-size:18px">Schools</h2>
         <details class="panel hidden" id="schools-add">
           <summary style="font-weight:700">Add a school</summary>
-          <p class="hint">Schools usually arrive with the import file, or are set up by their own ICT coordinator. Use this form for one school at a time. Its circuit must already be listed under Circuits above; if it is not, add the circuit first.</p>
+          <p class="hint">Schools usually arrive with the import file, or are set up by their own ICT coordinator. Use this form for one school at a time. Its circuit must already exist; if it does not, add the circuit first with <strong>Add a new circuit</strong> just above.</p>
           <div class="field"><label for="new-school-emis">School EMIS Code</label><input type="text" id="new-school-emis" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="e.g. 1066110031" /><div class="err" id="e-new-school-emis" role="alert"></div></div>
           <div class="field"><label for="new-school-name">School name</label><input type="text" id="new-school-name" maxlength="120" autocomplete="off" placeholder="e.g. Kokoben D/A JHS" /><div class="err" id="e-new-school-name" role="alert"></div></div>
           <div class="field"><label for="new-school-circuit">Circuit of this school</label><select id="new-school-circuit"></select><div class="err" id="e-new-school-circuit" role="alert"></div></div>
           <button type="button" class="sbtn" id="add-school">Add the school</button>
         </details>
+        <ul class="cards" id="circuit-list"></ul>
+        <h2 style="font-size:18px">Schools</h2>
         <div class="toolbar">
           <select id="school-circuit-filter" aria-label="Circuit"></select>
           <select id="school-sort" aria-label="Order of the schools">

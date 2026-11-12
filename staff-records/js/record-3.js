@@ -2273,7 +2273,7 @@ var $ = function (id) { return document.getElementById(id); };
           if (r && r.code === "INVALID") { $("e-new-circuit").textContent = r.message; return; }
           if (!r || !r.ok) { fail(r); return; }
           $("new-circuit").value = "";
-          showAlert_($("alert"), "ok", r.circuit + " circuit was added. You can now add its schools under Schools, and name its circuit ICT coordinator on its card.");
+          showAlert_($("alert"), "ok", r.circuit + " circuit was added. You can now add its schools with Add a school just below, and name its circuit ICT coordinator on its card.");
           loadOverview();
         }, fail);
       });
