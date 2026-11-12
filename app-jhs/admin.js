@@ -78,6 +78,7 @@ function showSection(name) {
     levyRecords: buildLevyRecordsSection,
     admissionFeeRecords: buildAdmissionFeeRecordsSection,
     tuitionFeeRecords: buildTuitionFeeRecordsSection,
+    otherLevyRecords: buildOtherLevyRecordsSection,
     sbaRecords: buildSbaRecordsSection,
     behaviorStatus: buildBehaviorStatusSection,
     mockExams: buildMockExamsSection,
@@ -742,6 +743,8 @@ var DESKTOP_RELEASES_API =
   "https://api.github.com/repos/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/latest";
 var DESKTOP_RELEASE_PAGE_PREFIX =
   "https://github.com/cosmopolitechdev-tech/mmodemmo-sma-portal/releases/";
+// The banner links to the product website, whose download buttons schools already know.
+var DESKTOP_DOWNLOAD_PAGE = "https://mmodemmo.cosmopolitechsolutions.com/";
 var DESKTOP_UPDATE_CHECKED = false;
 
 /* Compares "1.3.2"-style versions: negative, zero or positive like a sort comparator. */
@@ -767,14 +770,14 @@ function _checkDesktopUpdate(desktopVersion) {
       if (!release || !release.tag_name || !release.html_url) return;
       if (String(release.html_url).indexOf(DESKTOP_RELEASE_PAGE_PREFIX) !== 0) return;
       if (_compareDesktopVersions(release.tag_name, desktopVersion) <= 0) return;
-      _showDesktopUpdateBanner(String(release.tag_name).replace(/^v/i, ""), release.html_url);
+      _showDesktopUpdateBanner(String(release.tag_name).replace(/^v/i, ""));
     })
     .catch(function (err) {
       console.warn("Desktop update check failed:", err);
     });
 }
 
-function _showDesktopUpdateBanner(version, url) {
+function _showDesktopUpdateBanner(version) {
   var main = document.getElementById("mainContent");
   if (!main || document.getElementById("desktopUpdateBanner")) return;
   var bar = document.createElement("div");
@@ -784,7 +787,7 @@ function _showDesktopUpdateBanner(version, url) {
   var text = document.createElement("span");
   text.textContent = "A new desktop version (" + version + ") is available – ";
   var link = document.createElement("a");
-  link.href = url;
+  link.href = DESKTOP_DOWNLOAD_PAGE;
   link.target = "_blank";
   link.rel = "noopener noreferrer";
   link.textContent = "Download";
@@ -4945,6 +4948,179 @@ function buildTuitionFeeRecordsSection(container) {
     null,
     { type: "termlyfee" },
   );
+}
+
+// SECTION: OTHER LEVY RECORDS — school-named termly levies and daily fees (read-only).
+// Levies and rates come from the desktop app; this shows the current term's payments per class.
+var OTHER_LEVIES = [];
+
+// Creates an element with attributes and optional text (never parses HTML).
+function _olEl(tag, attrs, text) {
+  var node = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) {
+    if (k === "style") node.style.cssText = attrs[k];
+    else if (k === "className") node.className = attrs[k];
+    else node.setAttribute(k, attrs[k]);
+  });
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function _olGroup(label, control) {
+  var g = _olEl("div", { className: "form-group records-filter-group", style: "margin-bottom:0;" });
+  g.appendChild(_olEl("label", { className: "form-label" }, label));
+  g.appendChild(control);
+  return g;
+}
+
+function _olSelectedLevy() {
+  var code = document.getElementById("olLevySelect").value;
+  for (var i = 0; i < OTHER_LEVIES.length; i++) {
+    if (OTHER_LEVIES[i].levy_code === code) return OTHER_LEVIES[i];
+  }
+  return null;
+}
+
+function _olMessage(text) {
+  var wrap = document.getElementById("olTable");
+  wrap.textContent = "";
+  var box = _olEl("div", { className: "empty-state" });
+  box.appendChild(_olEl("div", { className: "empty-state__body" }, text));
+  wrap.appendChild(box);
+}
+
+function buildOtherLevyRecordsSection(container) {
+  container.textContent = "";
+  var header = _olEl("div", { className: "section-header" });
+  var titles = _olEl("div");
+  titles.appendChild(_olEl("div", { className: "section-header__title" }, "Other Levy Records"));
+  titles.appendChild(
+    _olEl(
+      "div",
+      { className: "section-header__subtitle" },
+      "School-named levies and daily fees added in the desktop app (Admission & Daily Fees → Custom Levies & Fees). Current term only.",
+    ),
+  );
+  header.appendChild(titles);
+  container.appendChild(header);
+
+  var row = _olEl("div", {
+    className: "records-filter-row",
+    style: "display:flex;gap:var(--space-4);flex-wrap:wrap;align-items:flex-end;margin-bottom:var(--space-4);",
+  });
+  var levySel = _olEl("select", { id: "olLevySelect", className: "form-control", style: "width:220px;" });
+  var classSel = _olEl("select", { id: "olClassSelect", className: "form-control", style: "width:160px;" });
+  _olFillClassOptions(classSel);
+  var dateInput = _olEl("input", { id: "olDateInput", type: "date", className: "form-control", style: "width:160px;" });
+  var d = new Date();
+  dateInput.value = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+  var dateGroup = _olGroup("Date", dateInput);
+  dateGroup.id = "olDateGroup";
+  row.appendChild(_olGroup("Levy / Fee", levySel));
+  row.appendChild(_olGroup("Class Level", classSel));
+  row.appendChild(dateGroup);
+  var loadBtn = _olEl("button", { className: "btn btn--primary" }, "🔍 Load Records");
+  loadBtn.addEventListener("click", loadOtherLevyRecords);
+  row.appendChild(loadBtn);
+  container.appendChild(row);
+  container.appendChild(
+    _olEl("div", { id: "olStats", style: "margin-bottom:var(--space-3);font-weight:600;font-size:var(--font-size-sm);" }),
+  );
+  container.appendChild(_olEl("div", { id: "olTable", className: "table-wrapper" }));
+  levySel.addEventListener("change", function () {
+    var levy = _olSelectedLevy();
+    dateGroup.style.display = levy && levy.frequency === "Daily" ? "" : "none";
+  });
+  _olMessage("Loading levies…");
+
+  _olCall("getCustomLevyRecordsForAdmin", { levyCode: "", classLevel: "", levyDate: "" }, ["", "", ""], function (r) {
+    if (_checkAuthCode(r)) return;
+    OTHER_LEVIES = (r && r.success && r.levies) || [];
+    levySel.textContent = "";
+    OTHER_LEVIES.forEach(function (l) {
+      levySel.appendChild(
+        _olEl("option", { value: l.levy_code }, l.levy_name + (l.frequency === "Daily" ? " (daily)" : " (termly)")),
+      );
+    });
+    if (OTHER_LEVIES.length === 0) {
+      loadBtn.disabled = true;
+      _olMessage("No other levies yet. Add them in the desktop app: Admission & Daily Fees → Custom Levies & Fees.");
+      return;
+    }
+    levySel.dispatchEvent(new Event("change"));
+    _olMessage("Choose a levy and class, then click Load Records.");
+  });
+}
+
+function loadOtherLevyRecords() {
+  var levy = _olSelectedLevy();
+  var classLevel = document.getElementById("olClassSelect").value;
+  if (!levy || !classLevel) {
+    showToast("Choose a levy and a class.", "warning");
+    return;
+  }
+  var daily = levy.frequency === "Daily";
+  var levyDate = daily ? document.getElementById("olDateInput").value : "";
+  _olMessage("Loading…");
+  _olCall(
+    "getCustomLevyRecordsForAdmin",
+    { levyCode: levy.levy_code, classLevel: classLevel, levyDate: levyDate },
+    [levy.levy_code, classLevel, levyDate],
+    function (r) {
+      if (_checkAuthCode(r)) return;
+      if (!r || !r.success) {
+        _olMessage((r && r.message) || "Could not load the records.");
+        return;
+      }
+      var stats = document.getElementById("olStats");
+      stats.textContent =
+        "Rate: " + (r.rate > 0 ? "GH₵ " + r.rate.toFixed(2) + (daily ? " per day" : " per term") : "not set") +
+        "  ·  Collected" + (daily ? " on this day" : " this term") + ": GH₵ " + (r.totalCollected || 0).toFixed(2) +
+        (daily ? "" : "  ·  Outstanding: GH₵ " + (r.totalOutstanding || 0).toFixed(2));
+      var records = r.records || [];
+      if (records.length === 0) {
+        _olMessage("No attending students in this class.");
+        return;
+      }
+      var cols = daily
+        ? [["student_name", "Student"], ["student_non_usable_id", "ID"], ["amount_paid", "Paid This Day"], ["term_total", "Paid This Term"], ["recorded_by", "Recorded By"], ["submitted_at", "Submitted"], ["sync_pending", "Awaiting Desktop"]]
+        : [["student_name", "Student"], ["student_non_usable_id", "ID"], ["amount_paid", "Paid This Term"], ["balance", "Balance"], ["recorded_by", "Recorded By"], ["submitted_at", "Submitted"], ["sync_pending", "Awaiting Desktop"]];
+      var table = _olEl("table", { className: "table table--striped" });
+      var head = _olEl("tr");
+      cols.forEach(function (c) {
+        head.appendChild(_olEl("th", {}, c[1]));
+      });
+      var thead = _olEl("thead");
+      thead.appendChild(head);
+      table.appendChild(thead);
+      var tbody = _olEl("tbody");
+      records.forEach(function (rec) {
+        var tr = _olEl("tr");
+        cols.forEach(function (c) {
+          var v = rec[c[0]];
+          if (c[0] === "amount_paid" || c[0] === "term_total" || c[0] === "balance") v = (parseFloat(v) || 0).toFixed(2);
+          if (c[0] === "sync_pending") v = String(v) === "1" ? "Yes" : "";
+          tr.appendChild(_olEl("td", {}, v === null || v === undefined ? "" : String(v)));
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      var wrap = document.getElementById("olTable");
+      wrap.textContent = "";
+      wrap.appendChild(table);
+    },
+  );
+}
+
+function _olCall(fn, obj, arr, onOk) {
+  var onFail = function () {
+    _olMessage("Could not reach the server. Check your connection and retry.");
+  };
+  callServer(fn, obj, ADMIN_TOKEN).then(onOk, onFail);
+}
+
+function _olFillClassOptions(select) {
+  setHtml(select, _classLevelSelectOptions(false));
 }
 
 // SECTION: SBA RECORDS — read-only Admin view.

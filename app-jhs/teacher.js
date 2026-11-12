@@ -368,6 +368,7 @@ function startTeacherDashboard_() {
           classLevel: "",
           academicYear: "",
         };
+        CUSTOM_LEVIES = Array.isArray(initResult.customLevies) ? initResult.customLevies : [];
 
         // buildTabs() must run AFTER TEACHER_DATA is populated, or
         // is_form_teacher/form_teacher_class read off an empty {}.
@@ -482,6 +483,13 @@ function buildTabs() {
     _addTab(tabsEl, panelsEl, "tab-tuifee", "💰 " + getLevyLabel("Tuition Fee"));
     _createPanel(panelsEl, "panel-tuifee");
     buildTermlyFeeTabContent("Tuition_Fee", "tuifee");
+  }
+
+  // Other Levies: school-named levies from the desktop, for this teacher's fee classes.
+  if (CUSTOM_LEVIES.length > 0 && _customLevyClasses().length > 0) {
+    _addTab(tabsEl, panelsEl, "tab-otherlevy", "🧾 Other Levies");
+    _createPanel(panelsEl, "panel-otherlevy");
+    buildCustomLevyTabContent();
   }
 
   // SBA Marks tab only renders if the Admin has assigned
@@ -3706,6 +3714,341 @@ function submitTermlyFeePayments(feeType, prefix) {
       if (s) s.amount_paid = r.amount_paid;
     });
   });
+}
+
+// OTHER LEVIES — school-named termly levies and daily fees set up on the desktop app.
+// Collected by whoever collects Daily Levy, Admission Fee or Tuition Fee for a class.
+// The entered figure is the student's TOTAL for the term (termly) or for the chosen day (daily).
+var CUSTOM_LEVIES = [];
+var CUSTOM_LEVY_STATE = { levy: null, classLevel: "", levyDate: "", rate: 0, students: [] };
+var CUSTOM_LEVY_COLLECTOR_TYPES = ["Daily_Levy", "Admission_Fee", "Tuition_Fee"];
+
+// Classes this teacher may collect custom levies for.
+function _customLevyClasses() {
+  var classes = [];
+  SESSION.assignments.forEach(function (a) {
+    if (
+      CUSTOM_LEVY_COLLECTOR_TYPES.indexOf(a.assignment_type) !== -1 &&
+      classes.indexOf(a.class_level) === -1
+    ) {
+      classes.push(a.class_level);
+    }
+  });
+  return classes;
+}
+
+// Creates an element with attributes and optional text (never parses HTML).
+function _clEl(tag, attrs, text) {
+  var el = document.createElement(tag);
+  Object.keys(attrs || {}).forEach(function (k) {
+    if (k === "style") el.style.cssText = attrs[k];
+    else if (k === "className") el.className = attrs[k];
+    else el.setAttribute(k, attrs[k]);
+  });
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function _clLabelled(label, control, id) {
+  var wrap = _clEl("span", id ? { id: id } : {});
+  wrap.appendChild(document.createTextNode(label + " "));
+  wrap.appendChild(control);
+  return wrap;
+}
+
+function _clToday() {
+  var d = new Date();
+  return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+}
+
+function _clSelectedLevy() {
+  var sel = document.getElementById("clLevySelect");
+  var code = sel ? sel.value : "";
+  for (var i = 0; i < CUSTOM_LEVIES.length; i++) {
+    if (CUSTOM_LEVIES[i].levy_code === code) return CUSTOM_LEVIES[i];
+  }
+  return null;
+}
+
+function _clGridChanged() {
+  var grid = document.getElementById("clGridWrapper");
+  return (
+    !!grid &&
+    Array.prototype.some.call(grid.querySelectorAll("input"), function (input) {
+      return input.value !== input.defaultValue;
+    })
+  );
+}
+
+function _clApplyLevyKind() {
+  var levy = _clSelectedLevy();
+  var wrap = document.getElementById("clDateWrap");
+  if (wrap) wrap.style.display = levy && levy.frequency === "Daily" ? "" : "none";
+}
+
+function _clResetGrid() {
+  CUSTOM_LEVY_STATE.students = [];
+  document.getElementById("clGridWrapper").textContent = "";
+  document.getElementById("btnSaveOtherLevy").disabled = true;
+  document.getElementById("clRateDisplay").textContent = "—";
+}
+
+function buildCustomLevyTabContent() {
+  var panel = document.getElementById("panel-otherlevy");
+  if (!panel) return;
+  panel.textContent = "";
+
+  var levySel = _clEl("select", { id: "clLevySelect", className: "form-control", style: "max-width:240px;" });
+  CUSTOM_LEVIES.forEach(function (l) {
+    levySel.appendChild(
+      _clEl("option", { value: l.levy_code }, l.levy_name + (l.frequency === "Daily" ? " (daily)" : " (termly)")),
+    );
+  });
+  var classSel = _clEl("select", { id: "clClassSelect", className: "form-control", style: "max-width:170px;" });
+  _customLevyClasses().forEach(function (cl) {
+    classSel.appendChild(_clEl("option", { value: cl }, cl));
+  });
+  var dateInput = _clEl("input", { id: "clDateInput", type: "date", className: "form-control", style: "max-width:170px;" });
+  dateInput.value = _clToday();
+  dateInput.max = _clToday();
+
+  var ctxRow = _clEl("div", {
+    style:
+      "display:flex;gap:var(--space-4);align-items:center;justify-content:center;flex-wrap:wrap;" +
+      "margin-bottom:var(--space-4);font-size:var(--font-size-sm);font-weight:600;",
+  });
+  ctxRow.appendChild(_clLabelled("Levy:", levySel));
+  ctxRow.appendChild(_clLabelled("Class:", classSel));
+  ctxRow.appendChild(_clLabelled("Date:", dateInput, "clDateWrap"));
+  ctxRow.appendChild(_clLabelled("Rate:", _clEl("strong", { id: "clRateDisplay" }, "—")));
+  panel.appendChild(ctxRow);
+
+  var loadRow = _clEl("div", { className: "btn-row--center", style: "margin-bottom:var(--space-4);" });
+  var loadBtn = _clEl("button", { id: "btnLoadOtherLevy", className: "btn btn--primary" }, "🔄 Load Students");
+  loadBtn.addEventListener("click", loadCustomLevyStudents);
+  loadRow.appendChild(loadBtn);
+  panel.appendChild(loadRow);
+
+  panel.appendChild(_clEl("div", { id: "clGridWrapper", style: "margin-top:var(--space-2);" }));
+
+  var saveRow = _clEl("div", { className: "btn-row--center" });
+  var saveBtn = _clEl("button", { id: "btnSaveOtherLevy", className: "btn btn--accent btn--lg" }, "💾 Save Payments");
+  saveBtn.disabled = true;
+  saveBtn.addEventListener("click", submitCustomLevyPayments);
+  saveRow.appendChild(saveBtn);
+  panel.appendChild(saveRow);
+
+  // Typed amounts are lost on a switch, so ask first when any were changed.
+  [levySel, classSel, dateInput].forEach(function (el) {
+    el.addEventListener("focus", function () {
+      el.dataset.current = el.value;
+    });
+    el.addEventListener("change", function () {
+      if (_clGridChanged() && !confirm("Your entries are not saved yet. Switch and discard them?")) {
+        el.value = el.dataset.current || el.value;
+        return;
+      }
+      el.dataset.current = el.value;
+      _clResetGrid();
+      _clApplyLevyKind();
+    });
+  });
+  _clApplyLevyKind();
+}
+
+function loadCustomLevyStudents() {
+  var levy = _clSelectedLevy();
+  var classLevel = document.getElementById("clClassSelect").value;
+  if (!levy || !classLevel) {
+    showToast("Choose a levy and a class.", "warning");
+    return;
+  }
+  var daily = levy.frequency === "Daily";
+  var levyDate = daily ? document.getElementById("clDateInput").value : "";
+  if (daily && !levyDate) {
+    showToast("Choose a date.", "warning");
+    return;
+  }
+  showSpinner();
+  _clCall(
+    "getStudentsForCustomLevyCollection",
+    { classLevel: classLevel, levyCode: levy.levy_code, levyDate: levyDate },
+    [classLevel, levy.levy_code, levyDate, SESSION.token],
+    function (res) {
+      hideSpinner();
+      if (!res || !res.success) {
+        if (_handleSessionCodes(res)) return;
+        showToast((res && res.message) || "Could not load the students.", "error");
+        _clResetGrid();
+        return;
+      }
+      CUSTOM_LEVY_STATE = {
+        levy: levy,
+        classLevel: classLevel,
+        levyDate: res.levyDate || "",
+        rate: res.rate || 0,
+        students: res.students || [],
+      };
+      var st = CUSTOM_LEVY_STATE;
+      document.getElementById("clRateDisplay").textContent =
+        st.rate > 0 ? "GH₵ " + st.rate.toFixed(2) + (daily ? " per day" : " per term") : "Not set";
+      var saveBtn = document.getElementById("btnSaveOtherLevy");
+      if (st.students.length === 0) {
+        var grid = document.getElementById("clGridWrapper");
+        grid.textContent = "";
+        var empty = _clEl("div", { className: "empty-state" });
+        empty.appendChild(_clEl("div", { className: "empty-state__icon" }, "👥"));
+        empty.appendChild(_clEl("div", { className: "empty-state__title" }, "No Students Found"));
+        grid.appendChild(empty);
+        saveBtn.disabled = true;
+        return;
+      }
+      renderCustomLevyGrid();
+      saveBtn.disabled = !(st.rate > 0);
+      if (!(st.rate > 0)) {
+        showToast(
+          "The " + levy.levy_name + " rate has not been set up yet for this class. " +
+            "Please contact the school administrator.",
+          "warning",
+        );
+      }
+    },
+    function (err) {
+      hideSpinner();
+      showToast(friendlyErrorFrontend(err ? err.message : ""), "error");
+    },
+  );
+}
+
+function renderCustomLevyGrid() {
+  var st = CUSTOM_LEVY_STATE;
+  var daily = st.levy.frequency === "Daily";
+  var wrap = document.getElementById("clGridWrapper");
+  wrap.textContent = "";
+  var table = _clEl("table", { className: "table table--striped" });
+  var headRow = _clEl("tr");
+  (daily
+    ? ["Student", "Paid This Term (GH₵)", "Amount for This Day (GH₵)"]
+    : ["Student", "Paid This Term (GH₵)", "Balance"]
+  ).forEach(function (h, i) {
+    headRow.appendChild(_clEl("th", i ? { style: "text-align:center;" } : {}, h));
+  });
+  var thead = _clEl("thead");
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+  var tbody = _clEl("tbody");
+  st.students.forEach(function (s) {
+    var tr = _clEl("tr");
+    var nameCell = _clEl("td", {}, [s.first_name, s.other_name, s.surname].filter(Boolean).join(" ") + " ");
+    nameCell.appendChild(
+      _clEl("span", { className: "text-muted text-xs" }, "(" + (s.student_non_usable_id || s.student_id) + ")"),
+    );
+    tr.appendChild(nameCell);
+    var paid = parseFloat(s.amount_paid) || 0;
+    var input = _clEl("input", {
+      type: "number",
+      min: "0",
+      step: "0.01",
+      className: "form-control cl-amount-input",
+      "data-sid": s.student_id,
+      style: "width:110px;text-align:center;",
+    });
+    if (!daily) input.max = String(st.rate);
+    input.defaultValue = paid.toFixed(2);
+    input.value = input.defaultValue;
+    var inputCell = _clEl("td", { style: "text-align:center;" });
+    inputCell.appendChild(input);
+    if (daily) {
+      tr.appendChild(_clEl("td", { style: "text-align:center;" }, (parseFloat(s.term_total) || 0).toFixed(2)));
+      tr.appendChild(inputCell);
+    } else {
+      tr.appendChild(inputCell);
+      var balance = _clEl("td", { style: "text-align:center;" }, "GH₵ " + Math.max(0, st.rate - paid).toFixed(2));
+      tr.appendChild(balance);
+      input.addEventListener("input", function () {
+        var v = parseFloat(input.value);
+        if (isNaN(v) || v < 0) v = 0;
+        balance.textContent = "GH₵ " + Math.max(0, st.rate - v).toFixed(2);
+      });
+    }
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  var scroller = _clEl("div", { style: "overflow-x:auto;" });
+  scroller.appendChild(table);
+  wrap.appendChild(scroller);
+  wrap.appendChild(
+    _clEl(
+      "p",
+      { className: "text-muted text-xs", style: "text-align:center;" },
+      daily
+        ? "Enter the total received from each student on this day. Record advance payments on today's date."
+        : "Enter each student's total paid this term (not just today's amount).",
+    ),
+  );
+}
+
+function submitCustomLevyPayments() {
+  var st = CUSTOM_LEVY_STATE;
+  if (!st.levy || !st.classLevel) {
+    showToast("Please load students before saving.", "warning");
+    return;
+  }
+  var daily = st.levy.frequency === "Daily";
+  var records = [];
+  var invalid = 0;
+  var inputs = document.querySelectorAll("#clGridWrapper .cl-amount-input");
+  Array.prototype.forEach.call(inputs, function (inp) {
+    var sid = inp.getAttribute("data-sid");
+    var raw = inp.value;
+    var amt = parseFloat(raw);
+    if (raw === "" || isNaN(amt) || amt < 0 || (!daily && amt > st.rate)) {
+      invalid++;
+      return;
+    }
+    // loaded_amount lets the server skip untouched rows and spot another collector's change.
+    var loaded = null;
+    st.students.forEach(function (x) {
+      if (x.student_id === sid) loaded = parseFloat(x.amount_paid) || 0;
+    });
+    records.push({ student_id: sid, amount_paid: amt, loaded_amount: loaded });
+  });
+  if (invalid > 0) {
+    showToast(
+      daily
+        ? "Amounts must be 0 or more."
+        : "Amounts must be between 0 and GH₵ " + st.rate.toFixed(2) + ".",
+      "error",
+    );
+    return;
+  }
+  if (records.length === 0) {
+    showToast("No students to save.", "warning");
+    return;
+  }
+  _clSave(document.getElementById("btnSaveOtherLevy"), st, records, function () {
+    records.forEach(function (r) {
+      st.students.forEach(function (x) {
+        if (x.student_id !== r.student_id) return;
+        if (daily) x.term_total = (parseFloat(x.term_total) || 0) - (parseFloat(x.amount_paid) || 0) + r.amount_paid;
+        x.amount_paid = r.amount_paid;
+      });
+    });
+    renderCustomLevyGrid();
+  });
+}
+
+function _clCall(fn, obj, arr, onOk, onFail) {
+  callServer(fn, obj, SESSION.token).then(onOk, onFail);
+}
+
+function _clSave(button, st, records, onOk) {
+  handleSaveWithRetry(
+    "saveCustomLevyPayments",
+    { classLevel: st.classLevel, levyCode: st.levy.levy_code, levyDate: st.levyDate, paymentRecords: records },
+    button,
+    onOk,
+  );
 }
 
 // SBA TAB — ACTIVATION & CONFIG
