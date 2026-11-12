@@ -167,8 +167,11 @@
       .tabs-top .tab { margin-bottom: -1px; flex: 1 0 auto; padding: 6px 12px; }
       .cards { list-style: none; margin: 0; padding: 0; }
       .cards > li { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
-      .cards .head { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
-      .cards .head strong { flex: 1; min-width: 60%; }
+      /* Name first; the code follows straight after it and wraps as one piece (owner, 2026-11-12). */
+      .cards .head { line-height: 1.35; }
+      .cards .head .meta { white-space: nowrap; margin-left: 8px; }
+      .cards .coline { font-size: 15px; margin-top: 2px; }
+      .cards .coline b { color: var(--text); }
       .cards .meta { font-size: 14px; color: var(--text-muted); }
       .cards .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
       .cards .actions > * { flex: 1 1 auto; }
@@ -191,7 +194,7 @@
       .counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 14px; }
       .counts li { background: #f4efe6; border-radius: 14px; padding: 4px 10px; }
       .stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; padding: 0; list-style: none; }
-      .stats li { background: #f4efe6; border-radius: 10px; padding: 6px 12px; min-width: 88px; font-size: 13px; }
+      .stats li { flex: 1 1 88px; background: #f4efe6; border-radius: 10px; padding: 6px 12px; font-size: 13px; text-align: center; }
       .stats b { display: block; font-size: 22px; line-height: 1.2; }
       textarea.msgbox { min-height: 160px; margin-top: 10px; font-size: 14px; }
       .slip-school h3 { font-size: 16px; margin: 16px 0 8px; }
@@ -480,8 +483,13 @@
           <div class="more" id="circuit-export"></div>
         </div>
         <div class="panel hidden" id="name-panel">
-          <h2 style="margin-top:0;font-size:18px">A school that is not on the list yet</h2>
-          <p class="hint">Choose the teacher who will be its ICT coordinator. They then sign in on the Teacher / School ICT tab and type the school's EMIS code and name. For a school already listed below, use that school's own "Name School ICT Coordinator" button.</p>
+          <h2 style="margin-top:0;font-size:18px">Add a new school to your circuit</h2>
+          <p class="hint">Only for a school that is <b>not</b> in the list below.</p>
+          <ol class="steps hint">
+            <li>Find the teacher who will be that school's ICT coordinator.</li>
+            <li>Tap <b>Name School ICT Coordinator</b>.</li>
+            <li>They sign in and enter the school's EMIS code and name. The school then shows below.</li>
+          </ol>
           <div id="name-picker"></div>
           <div class="err" id="e-name" role="alert"></div>
           <button type="button" class="btn" id="name-save">Name School ICT Coordinator</button>

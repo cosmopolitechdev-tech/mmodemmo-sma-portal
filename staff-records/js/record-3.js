@@ -870,6 +870,9 @@ var $ = function (id) { return document.getElementById(id); };
           while (line.firstChild) line.removeChild(line.firstChild);
           var temp = p.tempPassword;
           line.className = "pwline" + (p.password === "none" || p.password === "expired" ? " none" : "");
+          // "Has chosen their own" / "has a temporary one you cannot see" is noise here (owner, 2026-11-12).
+          var quiet = !temp && p.password !== "none" && p.password !== "expired";
+          line.classList.toggle("hidden", quiet);
           if (temp) {
             line.appendChild(document.createTextNode("Temporary password: "));
             line.appendChild(el("span", { "class": "key" }, temp));
@@ -877,7 +880,7 @@ var $ = function (id) { return document.getElementById(id); };
           } else {
             line.textContent = p.password === "none" ? "No password yet: give a temporary password so they can sign in."
               : p.password === "expired" ? "Their temporary password has expired: give a new one."
-              : p.password === "temp" ? "Has a temporary password (not shown to you)." : "Has chosen their own password.";
+              : "";
           }
           copy.classList.toggle("hidden", !temp);
           var msg = temp ? "Hello " + first + ", your temporary password for the staff records portal is " + temp + " — sign in at " +
@@ -887,7 +890,8 @@ var $ = function (id) { return document.getElementById(id); };
           if (link) wa.href = link;
           give.textContent = p.password === "none" ? "Give a temporary password" : "New temporary password";
           give.classList.toggle("hidden", !mayGive);
-          actions.classList.toggle("hidden", !temp && !mayGive); // a viewer who can do nothing here sees the state only
+          actions.classList.toggle("hidden", !temp && !mayGive);
+          box.classList.toggle("hidden", quiet && !mayGive);
         };
         copy.addEventListener("click", function () { copyText(p.tempPassword, copy); });
         give.addEventListener("click", function () {
@@ -1084,6 +1088,15 @@ var $ = function (id) { return document.getElementById(id); };
         list.forEach(function (s) { ul.appendChild(schoolCard(s)); });
       }
 
+      /* The school's ICT coordinator on its own line under the name, the name in bold. */
+      function coordinatorLine(co) {
+        if (!co) return el("div", { "class": "meta warnline" }, "No ICT coordinator yet");
+        var line = el("div", { "class": "meta coline" }, "ICT coordinator: ");
+        line.appendChild(el("b", {}, co.name || "Staff ID " + co.staffId));
+        if (co.status !== "Active") line.appendChild(document.createTextNode(" (" + co.status.toLowerCase() + ")"));
+        return line;
+      }
+
       function schoolCard(s) {
         var li = el("li", { id: "c-" + s.emis });
         var head = el("div", { "class": "head" });
@@ -1091,9 +1104,7 @@ var $ = function (id) { return document.getElementById(id); };
         head.appendChild(el("span", { "class": "meta" }, s.pending ? "" : "EMIS " + s.emis));
         li.appendChild(head);
         var co = s.coordinator;
-        li.appendChild(el("div", { "class": "meta" + (co ? "" : " warnline") }, co
-          ? "ICT coordinator: " + (co.name || "Staff ID " + co.staffId) + (co.status !== "Active" ? " (" + co.status.toLowerCase() + ")" : "")
-          : "No ICT coordinator yet"));
+        li.appendChild(coordinatorLine(co));
         if (s.pending) {
           li.appendChild(el("div", { "class": "meta warnline" }, "Waiting for " + (co && co.name ? titleWords(co.name) : "the coordinator") + " to sign in and enter the school's code and name."));
         } else {
@@ -1561,9 +1572,7 @@ var $ = function (id) { return document.getElementById(id); };
           head.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
           head.appendChild(el("span", { "class": "meta" }, s.circuit));
           li.appendChild(head);
-          li.appendChild(el("div", { "class": "meta" + (s.coordinator ? "" : " warnline") }, s.coordinator
-            ? "ICT coordinator: " + (s.coordinator.name || "Staff ID " + s.coordinator.staffId) + (s.coordinator.status !== "Active" ? " (" + s.coordinator.status.toLowerCase() + ")" : "")
-            : "No ICT coordinator yet"));
+          li.appendChild(coordinatorLine(s.coordinator));
           if (s.coordinator) {
             li.appendChild(passwordBlock(s.coordinator, !!S.adminCan["teachers.passwords"]));
           }
