@@ -4435,9 +4435,15 @@ function submitSba() {
     };
 
     handleSaveWithRetry("saveSbaMarks", params, saveBtn, function () {
+      // The server keeps a stored mark when its field is sent blank, so merge the same way.
+      var previous = SBA_EXISTING;
       SBA_EXISTING = {};
       collected.records.forEach(function (r) {
-        SBA_EXISTING[r.student_id] = r;
+        var merged = Object.assign({}, previous[r.student_id] || {});
+        Object.keys(r).forEach(function (k) {
+          if (r[k] !== null) merged[k] = r[k];
+        });
+        SBA_EXISTING[r.student_id] = merged;
       });
     });
   }

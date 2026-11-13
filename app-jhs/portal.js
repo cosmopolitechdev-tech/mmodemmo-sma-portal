@@ -3136,7 +3136,7 @@ function collectDailyLevyValues(gridContainer, students) {
   return { records: records, incomplete: incomplete };
 }
 
-// Collects SBA grid values: skips fully-blank rows, blocks partially-filled ones,
+// Collects SBA grid values: skips fully-blank rows, keeps partially-filled ones (blank = null),
 // and validates ranges.
 function collectSbaValues(gridContainer, students) {
   var records = [];
@@ -3186,15 +3186,7 @@ function collectSbaValues(gridContainer, students) {
       return;
     }
 
-    if (filledCount < inputs.length) {
-      errors.push(
-        "Please fill in all five fields for " +
-          displayName +
-          ", or leave all blank to skip this student.",
-      );
-      return;
-    }
-
+    // Partial rows are saved: teachers enter each assessment as it becomes available.
     records.push({
       student_id: sid,
       individual_test: values.individual_test,
