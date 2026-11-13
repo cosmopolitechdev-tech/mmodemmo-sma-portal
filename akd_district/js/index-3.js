@@ -123,7 +123,8 @@ var $ = function (id) { return document.getElementById(id); };
           o.value = name; o.textContent = name;
           sel.appendChild(o);
         });
-        $("tab-coordinator").classList.toggle("hidden", c.mode === "school"); // one school: admins and teachers only
+        // One school: admins and teachers only. One circuit: no circuit ICT coordinators either.
+        $("tab-coordinator").classList.toggle("hidden", c.mode === "school" || c.mode === "circuit");
         if (c.mode === "school") $("tab-teacher").textContent = "Teacher";
         $("t-note").classList.toggle("hidden", c.mode === "school");
         selectTab("teacher");

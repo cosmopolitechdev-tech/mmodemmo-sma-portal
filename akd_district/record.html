@@ -347,6 +347,7 @@
           <div id="privileges-section">
           <h2 style="font-size:18px">What coordinators may do</h2>
           <p class="hint" style="margin-bottom:4px">Only admins make someone a circuit or school ICT coordinator. Everything below is on until you take it away; admins can always do it.</p>
+          <div id="privileges-circuit">
           <p class="hint" style="margin:8px 0 4px"><b>Circuit ICT coordinators</b> (for the schools of their circuit):</p>
           <label class="check"><input type="checkbox" id="set-CIRCUIT_NAME_COORDINATORS" /> Name and replace school ICT coordinators</label>
           <label class="check"><input type="checkbox" id="set-CIRCUIT_EDIT_RECORDS" /> Edit teachers' records</label>
@@ -354,6 +355,7 @@
           <label class="check"><input type="checkbox" id="set-CIRCUIT_PASSWORD_RESETS" /> Give temporary passwords (school coordinators and teachers)</label>
           <label class="check"><input type="checkbox" id="set-CIRCUIT_SIGNIN_CONTROL" /> Switch sign-in off or on, and switch off or lock a school coordinator's access</label>
           <label class="check"><input type="checkbox" id="set-CIRCUIT_EXPORT" /> Download the staff records of their circuit and its schools</label>
+          </div>
           <p class="hint" style="margin:8px 0 4px"><b>School ICT coordinators</b> (for their own school):</p>
           <label class="check"><input type="checkbox" id="set-COORDINATOR_EDIT_RECORDS" /> Edit their teachers' records</label>
           <label class="check"><input type="checkbox" id="set-COORDINATOR_SERVICE_STATUS" /> Mark teachers at post or not at post</label>
@@ -438,10 +440,12 @@
           <div class="field"><label for="import-district-code">District code</label><input type="text" id="import-district-code" inputmode="numeric" maxlength="6" autocomplete="off" />
             <div class="hint hidden" id="import-code-hint">The Main Admin sets it in Settings.</div><div class="err" id="e-import-code" role="alert"></div></div>
           <button type="button" class="sbtn" id="import-code-save">Save the district code</button>
+          <div id="import-circuits-box">
           <div class="field" style="margin-top:12px"><label for="import-circuits">Circuits <span class="hint">— one per line</span></label>
             <textarea id="import-circuits" spellcheck="false" rows="8"></textarea>
             <div class="hint" id="import-circuit-status"></div><div class="err" id="e-import-circuit" role="alert"></div></div>
           <button type="button" class="sbtn" id="import-save-circuits">Save the circuits</button>
+          </div>
         </div>
         <div class="panel">
           <h2 style="margin-top:0;font-size:18px">Add many teachers from a file</h2>
@@ -491,7 +495,7 @@
           <div class="field"><label for="find-q">Name or Staff ID</label><input type="text" id="find-q" maxlength="60" autocomplete="off" /></div>
           <div class="filters">
             <div class="field"><label for="find-sex">Sex</label><select id="find-sex"><option value="">All</option></select></div>
-            <div class="field"><label for="find-circuit">Circuit</label><select id="find-circuit"><option value="">All circuits</option></select></div>
+            <div class="field" id="find-circuit-field"><label for="find-circuit">Circuit</label><select id="find-circuit"><option value="">All circuits</option></select></div>
             <div class="field"><label for="find-school">School</label><select id="find-school"><option value="">All schools</option></select></div>
           </div>
           <div class="err" id="e-find" role="alert"></div>
@@ -515,7 +519,7 @@
           <ul class="counts" id="district-counts"></ul>
           <div class="more" id="district-export"></div>
         </div>
-        <h2 style="font-size:18px">Circuits</h2>
+        <h2 style="font-size:18px" id="circuits-heading">Circuits</h2>
         <details class="panel hidden" id="circuit-add">
           <summary style="font-weight:700">Add a new circuit</summary>
           <p class="hint">Only for a circuit the district does not have yet. This adds the circuit itself, not a school: to add a school to a circuit, use <strong>Add a school</strong> just below and choose its circuit there.</p>
@@ -528,7 +532,7 @@
           <p class="hint">Schools usually arrive with the import file, or are set up by their own ICT coordinator. Use this form for one school at a time. Its circuit must already exist; if it does not, add the circuit first with <strong>Add a new circuit</strong> just above.</p>
           <div class="field"><label for="new-school-emis">School EMIS Code</label><input type="text" id="new-school-emis" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="e.g. 1066110031" /><div class="err" id="e-new-school-emis" role="alert"></div></div>
           <div class="field"><label for="new-school-name">School name</label><input type="text" id="new-school-name" maxlength="120" autocomplete="off" placeholder="e.g. Kokoben D/A JHS" /><div class="err" id="e-new-school-name" role="alert"></div></div>
-          <div class="field"><label for="new-school-circuit">Circuit of this school</label><select id="new-school-circuit"></select><div class="err" id="e-new-school-circuit" role="alert"></div></div>
+          <div class="field" id="new-school-circuit-field"><label for="new-school-circuit">Circuit of this school</label><select id="new-school-circuit"></select><div class="err" id="e-new-school-circuit" role="alert"></div></div>
           <button type="button" class="sbtn" id="add-school">Add the school</button>
         </details>
         <ul class="cards" id="circuit-list"></ul>

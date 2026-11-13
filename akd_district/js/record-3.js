@@ -1418,6 +1418,8 @@ var $ = function (id) { return document.getElementById(id); };
           if (!r || !r.ok) { fail(r); return; }
           S.overview = r;
           S.adminCan = r.can;
+          S.circuitMode = r.district.mode === "circuit";
+          $("tab-overview").textContent = S.circuitMode ? "My Circuit" : "Overview";
           $("tab-teachers").classList.toggle("hidden", !r.can["teachers.view"]);
           $("tab-import").classList.toggle("hidden", !r.can["teachers.import"]);
           $("tab-admins").classList.toggle("hidden", !r.can["admins.manage"]);
@@ -1457,9 +1459,14 @@ var $ = function (id) { return document.getElementById(id); };
 
       function renderOverview() {
         var r = S.overview, c = r.counts;
-        renderStats($("district-stats"), [["Teachers in the district", c.total], ["Schools", r.schools.filter(function (s) { return !s.pending && !isOffice(s.emis); }).length], ["Circuits", r.circuits.length]]);
+        var schoolCount = r.schools.filter(function (s) { return !s.pending && !isOffice(s.emis); }).length;
+        renderStats($("district-stats"), S.circuitMode ? [["Teachers in the circuit", c.total], ["Schools", schoolCount]]
+          : [["Teachers in the district", c.total], ["Schools", schoolCount], ["Circuits", r.circuits.length]]);
+        // One circuit: no circuit cards, no circuit to choose; the schools below are the circuit's.
+        ["circuits-heading", "school-circuit-filter", "new-school-circuit-field"].forEach(function (id) { $(id).classList.toggle("hidden", !!S.circuitMode); });
+        if (S.circuitMode) $("circuit-add").classList.add("hidden");
         showWho((r.district.name || r.district.mmda || "District") + (r.main ? " · Main Admin" : " · Admin"), r.termLabel);
-        $("district-name").textContent = r.district.mmda || "District";
+        $("district-name").textContent = S.circuitMode ? r.district.name : r.district.mmda || "District";
         $("district-pct").textContent = r.pct + "%";
         $("district-bar").style.width = r.pct + "%";
         $("district-pct-text").textContent = "of " + c.active + " teachers complete · average " + r.averagePct + "% · " + r.signInsToday + " sign-in" + (r.signInsToday === 1 ? "" : "s") + " today";
@@ -1473,8 +1480,9 @@ var $ = function (id) { return document.getElementById(id); };
         var dx = $("district-export");
         while (dx.firstChild) dx.removeChild(dx.firstChild);
         if (canExport()) {
-          dx.appendChild(exportButton("Download District Staff List Records (Excel)", { kind: "district" }));
-          dx.appendChild(exportButton("Download District Staff List (CSV)", { kind: "district" }, true));
+          var what = S.circuitMode ? "Circuit" : "District";
+          dx.appendChild(exportButton("Download " + what + " Staff List Records (Excel)", { kind: "district" }));
+          dx.appendChild(exportButton("Download " + what + " Staff List (CSV)", { kind: "district" }, true));
         }
         var cl = $("circuit-list");
         while (cl.firstChild) cl.removeChild(cl.firstChild);
@@ -1489,7 +1497,7 @@ var $ = function (id) { return document.getElementById(id); };
         while (pick.firstChild) pick.removeChild(pick.firstChild);
         pick.appendChild(el("option", { value: "" }, "Choose the school's circuit…"));
         r.circuits.forEach(function (x) { pick.appendChild(el("option", { value: x.circuit }, x.circuit)); });
-        pick.value = chosen;
+        pick.value = S.circuitMode && r.circuits.length ? r.circuits[0].circuit : chosen;
         renderDistrictSchools();
       }
 
@@ -1499,7 +1507,7 @@ var $ = function (id) { return document.getElementById(id); };
         head.appendChild(el("strong", {}, x.circuit));
         head.appendChild(el("span", { "class": "meta" }, x.schools + " school" + (x.schools === 1 ? "" : "s")));
         li.appendChild(head);
-        li.appendChild(el("div", { "class": "meta" + (x.coordinator ? "" : " warnline") }, x.coordinator
+        if (!S.circuitMode) li.appendChild(el("div", { "class": "meta" + (x.coordinator ? "" : " warnline") }, x.coordinator
           ? "Circuit coordinator: " + (x.coordinator.name || "Staff ID " + x.coordinator.staffId) + (x.coordinator.status !== "Active" ? " (" + x.coordinator.status.toLowerCase() + ")" : "")
           : "No circuit coordinator yet"));
         var bar = el("div", { "class": "bar small", "aria-hidden": "true" });
@@ -1512,11 +1520,11 @@ var $ = function (id) { return document.getElementById(id); };
         if (x.noCoordinator) todo.push(x.noCoordinator + " without a coordinator");
         li.appendChild(el("div", { "class": "meta" }, x.pct + "% complete · " + x.counts.active + " teacher" + (x.counts.active === 1 ? "" : "s") + (todo.length ? " · " + todo.join(", ") : "")));
         var actions = el("div", { "class": "actions" });
-        var open = el("button", { type: "button", "class": "sbtn" }, "Open circuit");
+        var open = el("button", { type: "button", "class": "sbtn" }, S.circuitMode ? "Manage the schools" : "Open circuit");
         open.addEventListener("click", function () { S.circuitName = x.circuit; loadCircuit(true); });
         actions.appendChild(open);
-        if (canExport()) actions.appendChild(exportButton("Download Staff Records", { kind: "circuit", circuit: x.circuit }));
-        if (x.coordinator) {
+        if (canExport() && !S.circuitMode) actions.appendChild(exportButton("Download Staff Records", { kind: "circuit", circuit: x.circuit })); // one circuit: the download is above
+        if (x.coordinator && !S.circuitMode) {
           var link = waLink(x.coordinator.phone, "Hello " + titleWords((x.coordinator.name || "").split(" ")[0]) + ", " + x.circuit +
             " circuit is " + x.pct + "% complete on the staff records portal. " + shareLink(S.overview.link));
           var wa = el("a", { "class": "sbtn wa", target: "_blank", rel: "noopener", href: link || "#" }, link ? "WhatsApp" : "No phone number");
@@ -1524,6 +1532,7 @@ var $ = function (id) { return document.getElementById(id); };
           actions.appendChild(wa);
         }
         li.appendChild(actions);
+        if (S.circuitMode) return li; // the admin runs the circuit: no circuit coordinator to manage
         if (x.coordinator) {
           li.appendChild(passwordBlock(x.coordinator, !!S.adminCan["teachers.passwords"]));
         }
@@ -1581,7 +1590,7 @@ var $ = function (id) { return document.getElementById(id); };
           var li = el("li", { id: "d-" + s.emis });
           li.appendChild(el("div", { "class": "head" }, ""));
           li.firstChild.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
-          li.appendChild(el("div", { "class": "meta" }, isOffice(s.emis) ? "District office (no EMIS code, no circuit)" : (s.pending ? "" : "EMIS " + s.emis + " · ") + s.circuit + " circuit"));
+          li.appendChild(el("div", { "class": "meta" }, isOffice(s.emis) ? "District office (no EMIS code, no circuit)" : S.circuitMode ? (s.pending ? "" : "EMIS " + s.emis) : (s.pending ? "" : "EMIS " + s.emis + " · ") + s.circuit + " circuit"));
           li.appendChild(coordinatorLine(s.coordinator));
           if (s.coordinator) {
             li.appendChild(passwordBlock(s.coordinator, !!S.adminCan["teachers.passwords"]));
@@ -1640,6 +1649,7 @@ var $ = function (id) { return document.getElementById(id); };
       }
 
       function fillTableFilters(r) {
+        $("find-circuit-field").classList.toggle("hidden", !!S.circuitMode);
         [["find-sex", r.sexes, "All"], ["find-circuit", r.circuits, "All circuits"]].forEach(function (x) {
           var sel = $(x[0]), keep = sel.value;
           if (sel.options.length === x[1].length + 1) return;
@@ -1814,6 +1824,7 @@ var $ = function (id) { return document.getElementById(id); };
       /* The circuits and district code the template is built from; changed here by those allowed to. */
       function renderImportSetup(r) {
         $("import-setup").classList.toggle("hidden", !!r.schoolMode);
+        $("import-circuits-box").classList.toggle("hidden", !!S.circuitMode); // its one circuit, set at setup
         $("import-first-step").classList.toggle("hidden", !!r.schoolMode);
         $("import-district-code").value = r.districtCode || "";
         $("import-district-code").disabled = !r.can.districtCode;
@@ -2174,7 +2185,8 @@ var $ = function (id) { return document.getElementById(id); };
         callServer_("getSettings", [S.token], function (r) {
           if (!r || !r.ok) { fail(r); return; }
           S.settings = r;
-          $("waves-section").classList.toggle("hidden", !!S.schoolMode);
+          $("waves-section").classList.toggle("hidden", !!(S.schoolMode || S.circuitMode));
+          $("privileges-circuit").classList.toggle("hidden", !!S.circuitMode); // no circuit ICT coordinators
           $("set-district-code-field").classList.toggle("hidden", !!S.schoolMode);
           $("privileges-section").classList.toggle("hidden", !!S.schoolMode); // one school: no coordinators
           renderSettings();
