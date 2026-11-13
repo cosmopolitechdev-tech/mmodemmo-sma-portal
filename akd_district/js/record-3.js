@@ -1058,8 +1058,9 @@ var $ = function (id) { return document.getElementById(id); };
         }
         // Admins name circuit coordinators on the Overview and school coordinators in each school's
         // card; a circuit coordinator also names the coordinator of a school not listed yet here.
-        $("name-panel").classList.toggle("hidden", !r.canManage || !!S.admin);
-        if (r.canManage && !S.admin && !S.namePicker) {
+        var mayName = r.canManage && (!r.can || r.can.name !== false); // the admin may take naming away
+        $("name-panel").classList.toggle("hidden", !mayName || !!S.admin);
+        if (mayName && !S.admin && !S.namePicker) {
           S.namePicker = staffPicker($("name-picker"), { id: "name-id", scope: { unplaced: true }, showSchool: true, lazy: true,
             notFound: function (id) { return "Staff ID " + id + " is not a teacher of your circuit, nor a teacher with no school yet. Search by name above, or check the number."; } });
         }
@@ -1140,6 +1141,7 @@ var $ = function (id) { return document.getElementById(id); };
         if (co && (!S.circuitSummary.can || S.circuitSummary.can.access)) li.appendChild(coordinatorStatusSelect(s));
         var more = el("div", { "class": "more manage" });
         var replace = el("button", { type: "button", "class": "sbtn" }, co ? "Replace School ICT Coordinator…" : "Name School ICT Coordinator…");
+        if (S.circuitSummary.can && S.circuitSummary.can.name === false) replace.classList.add("hidden");
         replace.addEventListener("click", function () {
           pickerForm(li, "replace", {
             intro: s.pending ? "Choose the teacher who will set up this school: search their name, or type their Staff ID. Only teachers with no school yet can be chosen."
@@ -1630,20 +1632,23 @@ var $ = function (id) { return document.getElementById(id); };
       /* Every teacher of the district in rows (owner, 2026-11-13): the staff list's columns, scrolled
          sideways and down; sex and circuit filters; a search shows only the teachers it finds. */
       function loadTable(more) {
+        more = !!(more && S.table && S.tableFilter);
         var q = $("find-q").value.trim();
         $("e-find").textContent = "";
-        if (q.length === 1) { $("e-find").textContent = "Type at least 2 letters of a name, or a Staff ID."; return; }
-        var offset = more && S.table ? S.table.rows.length : 0;
+        if (!more && q.length === 1) { $("e-find").textContent = "Type at least 2 letters of a name, or a Staff ID."; return; }
+        // More rows continue the list on screen: its own search and filters, whatever is typed since.
+        var filter = more ? S.tableFilter : { q: q, sex: $("find-sex").value, circuit: $("find-circuit").value, school: $("find-school").value };
+        var offset = more ? S.table.rows.length : 0;
         $("find-go").disabled = true;
         $("table-more").disabled = true;
         $("table-count").textContent = "Loading the teachers…";
         var done = function () { $("find-go").disabled = false; $("table-more").disabled = false; };
-        callServer_("listDistrictTeachers", [S.token, { q: q, sex: $("find-sex").value, circuit: $("find-circuit").value, school: $("find-school").value }, offset], function (r) {
+        callServer_("listDistrictTeachers", [S.token, filter, offset], function (r) {
           done();
           if (!r || !r.ok) { $("table-count").textContent = ""; $("e-find").textContent = (r && r.message) || "Could not load the teachers."; return; }
           fillTableFilters(r);
-          if (more && S.table) { S.table.rows = S.table.rows.concat(r.rows); S.table.more = r.more; S.table.total = r.total; }
-          else S.table = r;
+          if (more) { S.table.rows = S.table.rows.concat(r.rows); S.table.more = r.more; S.table.total = r.total; }
+          else { S.table = r; S.tableFilter = filter; }
           renderTable(!more);
         }, function (e) { done(); $("table-count").textContent = ""; fail(e); });
       }
@@ -1652,7 +1657,8 @@ var $ = function (id) { return document.getElementById(id); };
         $("find-circuit-field").classList.toggle("hidden", !!S.circuitMode);
         [["find-sex", r.sexes, "All"], ["find-circuit", r.circuits, "All circuits"]].forEach(function (x) {
           var sel = $(x[0]), keep = sel.value;
-          if (sel.options.length === x[1].length + 1) return;
+          // Rebuilt when the choices differ (a circuit renamed keeps the count but not the name).
+          if (JSON.stringify([].map.call(sel.options, function (o) { return o.value; }).slice(1)) === JSON.stringify(x[1])) return;
           while (sel.firstChild) sel.removeChild(sel.firstChild);
           sel.appendChild(el("option", { value: "" }, x[2]));
           x[1].forEach(function (v) { sel.appendChild(el("option", { value: v }, v)); });
@@ -2354,11 +2360,14 @@ var $ = function (id) { return document.getElementById(id); };
       personLookup("ln", $("ln-save"));
       PERSON_FIELDS.slice(1, 4).forEach(function (k) { upperInput($("ln-" + k)); });
       $("ln-save").addEventListener("click", function () {
-        PERSON_FIELDS.concat(["password"]).forEach(function (k) { $("e-ln-" + k).textContent = ""; });
+        PERSON_FIELDS.concat(["password", "staffPassword"]).forEach(function (k) { $("e-ln-" + k).textContent = ""; });
         $("ln-save").disabled = true;
-        callServer_("linkMyStaffId", [S.token, personForm("ln"), $("ln-password").value], function (r) {
+        callServer_("linkMyStaffId", [S.token, personForm("ln"), $("ln-password").value, $("ln-staffPassword").value], function (r) {
           $("ln-save").disabled = false;
           $("ln-password").value = "";
+          $("ln-staffPassword").value = "";
+          // A Staff ID with a teacher's record: its own password shows it is this admin's.
+          if (r && r.code === "PROVE") $("ln-proof").classList.remove("hidden");
           if (r && r.ok) {
             $("link-form").classList.add("hidden");
             $("link-done").classList.remove("hidden");
