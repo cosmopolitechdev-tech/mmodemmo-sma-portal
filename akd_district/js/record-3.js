@@ -591,6 +591,9 @@ var $ = function (id) { return document.getElementById(id); };
       /* ---- My School (coordinators). Only what the server allowed is shown; it checks again on every call. */
       function showWho(school, term) {
         $("top-who").textContent = [storeGet_("name") || "", school, term].filter(Boolean).join(" · ");
+        // The browser tab names the district, circuit or school: "Atwima Kwanwoma District — Staff Records".
+        var place = String(school || "").split(" · ")[0];
+        document.title = (place ? place + " — " : "") + "Staff Records";
       }
 
       function showView(view) {
@@ -1421,6 +1424,8 @@ var $ = function (id) { return document.getElementById(id); };
           $("tab-settings").classList.toggle("hidden", !r.can["settings"]);
           $("tab-audit").classList.toggle("hidden", !r.can["audit.view"]);
           $("tab-record").classList.toggle("hidden", !r.can["record.own"]);
+          // An admin made before Staff IDs: offer the switch until it is done.
+          $("link-staff").classList.toggle("hidden", !!r.can["record.own"] || !$("link-done").classList.contains("hidden"));
           $("schools-add").classList.toggle("hidden", !r.can["schools.manage"]);
           $("circuit-add").classList.toggle("hidden", !r.can["schools.manage"]);
           if (r.school) {
@@ -2331,6 +2336,29 @@ var $ = function (id) { return document.getElementById(id); };
       }
       PERSON_FIELDS.slice(1, 4).forEach(function (k) { upperInput($("new-" + k)); upperInput($("ho-" + k)); });
       personLookup("new", $("new-admin-save"));
+      personLookup("ln", $("ln-save"));
+      PERSON_FIELDS.slice(1, 4).forEach(function (k) { upperInput($("ln-" + k)); });
+      $("ln-save").addEventListener("click", function () {
+        PERSON_FIELDS.concat(["password"]).forEach(function (k) { $("e-ln-" + k).textContent = ""; });
+        $("ln-save").disabled = true;
+        callServer_("linkMyStaffId", [S.token, personForm("ln"), $("ln-password").value], function (r) {
+          $("ln-save").disabled = false;
+          $("ln-password").value = "";
+          if (r && r.ok) {
+            $("link-form").classList.add("hidden");
+            $("link-done").classList.remove("hidden");
+            $("link-done-text").textContent = "Done. From now on you sign in on the Admin tab with your Staff ID " + r.staffId + " and the same password.";
+            return;
+          }
+          if (r && r.errors) {
+            Object.keys(r.errors).forEach(function (k) { if ($("e-ln-" + k)) $("e-ln-" + k).textContent = r.errors[k]; });
+            // A sub-admin cannot look a Staff ID up: the names are asked for when the server needs them.
+            if (r.errors.surname || r.errors.firstName || r.errors.sex) $("ln-names").classList.remove("hidden");
+          }
+          if (r && !r.errors) fail(r);
+        }, function (e) { $("ln-save").disabled = false; fail(e); });
+      });
+      $("ln-again").addEventListener("click", signOutNow);
       personLookup("ho", null);
       $("new-admin-save").addEventListener("click", function () {
         PERSON_FIELDS.concat(["whatsapp", "email"]).forEach(function (k) { $("e-new-" + k).textContent = ""; });

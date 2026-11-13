@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <title>Staff Records</title>
     <base target="_top" />
     <meta charset="utf-8" />
     <style>
@@ -251,6 +253,26 @@
     <main class="page">
       <p id="loading">Loading…</p>
       <div id="alert" class="hidden" role="alert" data-banner></div>
+      <section id="link-staff" class="panel hidden">
+        <h2 style="margin-top:0;font-size:18px">Sign in with your Staff ID from now on</h2>
+        <p class="hint">Your admin account still uses the username chosen when it was made. Admins now sign in with their Staff ID and keep a staff record like every teacher. Do this once.</p>
+        <div id="link-form">
+          <div class="field"><label for="ln-staffId">Your Staff ID</label><input type="text" id="ln-staffId" inputmode="numeric" maxlength="15" autocomplete="off" /><div class="hint" id="ln-known" aria-live="polite"></div><div class="err" id="e-ln-staffId"></div></div>
+          <div id="ln-names" class="hidden">
+            <p class="hint">No staff record has this Staff ID yet. Give your names and sex; the rest of your record you fill in on My record.</p>
+            <div class="field"><label for="ln-surname">Surname</label><input type="text" id="ln-surname" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ln-surname"></div></div>
+            <div class="field"><label for="ln-firstName">First name</label><input type="text" id="ln-firstName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ln-firstName"></div></div>
+            <div class="field"><label for="ln-otherNames">Other names <span class="hint">— optional</span></label><input type="text" id="ln-otherNames" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ln-otherNames"></div></div>
+            <div class="field"><label for="ln-sex">Sex</label><select id="ln-sex"><option value="">— choose —</option><option>Male</option><option>Female</option></select><div class="err" id="e-ln-sex"></div></div>
+          </div>
+          <div class="field"><label for="ln-password">Your password, to confirm</label><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="ln-password" maxlength="128" autocomplete="current-password" /><div class="err" id="e-ln-password"></div></div>
+          <button type="button" class="btn" id="ln-save">Use my Staff ID</button>
+        </div>
+        <div id="link-done" class="hidden">
+          <p class="alert ok" id="link-done-text"></p>
+          <button type="button" class="btn" id="ln-again">Sign in again</button>
+        </div>
+      </section>
         <div id="temp-box" class="panel hidden" role="dialog" aria-labelledby="temp-title">
           <h2 style="margin-top:0" id="temp-title">New temporary password</h2>
           <p id="temp-for"></p>
