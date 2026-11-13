@@ -1,0 +1,4 @@
+# The district staff records portal moved to its short address (2026-11-13); old links still work.
+/staff-records /akd_district/ 301
+/staff-records/ /akd_district/ 301
+/staff-records/* /akd_district/:splat 301

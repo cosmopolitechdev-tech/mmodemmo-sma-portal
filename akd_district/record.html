@@ -165,6 +165,19 @@
       /* Admins have many tabs: they scroll sideways on a phone instead of squeezing. */
       .tabs-top .in { max-width: 760px; margin: 0 auto; display: flex; overflow-x: auto; scrollbar-width: none; }
       .tabs-top .tab { margin-bottom: -1px; flex: 1 0 auto; padding: 6px 12px; }
+      /* The admin's teachers table: its own box scrolls both ways, the header row and No. stay in view. */
+      body.wide .page { max-width: 1200px; }
+      .filters { display: flex; gap: 12px; flex-wrap: wrap; }
+      .filters .field { flex: 1 1 140px; }
+      .table-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); margin-bottom: 12px; -webkit-overflow-scrolling: touch; }
+      .teacher-table { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+      .teacher-table th, .teacher-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; text-align: left; vertical-align: top; }
+      .teacher-table thead th { position: sticky; top: 0; z-index: 2; background: #f7f1e8; font-weight: 700; }
+      .teacher-table .sn { position: sticky; left: 0; z-index: 1; background: var(--bg-card); text-align: right; border-right: 1px solid var(--border); }
+      .teacher-table thead .sn { z-index: 3; background: #f7f1e8; }
+      .teacher-table tbody tr { cursor: pointer; }
+      .teacher-table tbody tr:hover td, .teacher-table tbody tr.picked-row td { background: #fff4e5; }
+      .teacher-table tbody tr:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
       .cards { list-style: none; margin: 0; padding: 0; }
       .cards > li { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
       /* Name first; the code follows straight after it and wraps as one piece (owner, 2026-11-12). */
@@ -292,8 +305,11 @@
             <div class="field"><label for="set-TERM">Term</label><select id="set-TERM"></select><div class="err" id="e-set-TERM"></div></div>
           </div>
           <h2 style="font-size:18px">Reminder message</h2>
-          <div class="field"><label for="set-REMINDER_MESSAGE">WhatsApp reminder <span class="hint">— {first_name}, {percent}, {missing}, {link} are filled in</span></label>
-            <textarea id="set-REMINDER_MESSAGE" maxlength="500"></textarea><div class="err" id="e-set-REMINDER_MESSAGE"></div></div>
+          <p class="hint">The wording of the WhatsApp message a coordinator sends a teacher with the <b>WhatsApp</b> button on My School. You write the wording once (or keep this one); you never type a teacher's details here. When a coordinator taps the button, the portal puts that teacher's own details in place of the words in curly brackets:
+            <b>{first_name}</b> their first name, <b>{percent}</b> how complete their record is, <b>{missing}</b> the parts still to fill in, <b>{link}</b> the portal link below. Keep the curly brackets as they are.</p>
+          <div class="field"><label for="set-REMINDER_MESSAGE">WhatsApp reminder</label>
+            <textarea id="set-REMINDER_MESSAGE" maxlength="500"></textarea><div class="err" id="e-set-REMINDER_MESSAGE"></div>
+            <div class="hint" id="reminder-example"></div></div>
           <h2 style="font-size:18px">Portal link</h2>
           <div class="field"><label for="set-PORTAL_LINK">The address people are sent <span class="hint">— in WhatsApp messages, slips and emails</span></label>
             <input type="text" inputmode="url" id="set-PORTAL_LINK" maxlength="200" autocapitalize="none" placeholder="https://…" />
@@ -306,12 +322,24 @@
           <h2 style="font-size:18px">Maintenance</h2>
           <label class="check"><input type="checkbox" id="set-MAINTENANCE_MODE" /> Close the portal for teachers and coordinators (admins can still work)</label>
           <div class="field"><label for="set-MAINTENANCE_MESSAGE">Message they see</label><input type="text" id="set-MAINTENANCE_MESSAGE" maxlength="300" /><div class="err" id="e-set-MAINTENANCE_MESSAGE"></div></div>
+          <div id="privileges-section">
+          <h2 style="font-size:18px">What coordinators may do</h2>
+          <p class="hint" style="margin-bottom:4px">Only admins make someone a circuit or school ICT coordinator. Everything below is on until you take it away; admins can always do it.</p>
+          <p class="hint" style="margin:8px 0 4px"><b>Circuit ICT coordinators</b> (for the schools of their circuit):</p>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_NAME_COORDINATORS" /> Name and replace school ICT coordinators</label>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_EDIT_RECORDS" /> Edit teachers' records</label>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_SERVICE_STATUS" /> Mark teachers at post or not at post</label>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_PASSWORD_RESETS" /> Give temporary passwords (school coordinators and teachers)</label>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_SIGNIN_CONTROL" /> Switch sign-in off or on, and switch off or lock a school coordinator's access</label>
+          <label class="check"><input type="checkbox" id="set-CIRCUIT_EXPORT" /> Download the staff records of their circuit and its schools</label>
+          <p class="hint" style="margin:8px 0 4px"><b>School ICT coordinators</b> (for their own school):</p>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_EDIT_RECORDS" /> Edit their teachers' records</label>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_SERVICE_STATUS" /> Mark teachers at post or not at post</label>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_PASSWORD_RESETS" /> Give their teachers temporary passwords</label>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_SIGNIN_CONTROL" /> Switch their teachers' sign-in off or on</label>
+          <label class="check"><input type="checkbox" id="set-COORDINATOR_EXPORT" /> Download their school's staff records</label>
+          </div>
           <h2 style="font-size:18px">Passwords and sessions</h2>
-          <p class="hint" style="margin-bottom:4px">What coordinators may do for the people below them (admins always can):</p>
-          <label class="check"><input type="checkbox" id="set-CIRCUIT_PASSWORD_RESETS" /> Circuit coordinators may give temporary passwords (school coordinators and teachers)</label>
-          <label class="check"><input type="checkbox" id="set-CIRCUIT_SIGNIN_CONTROL" /> Circuit coordinators may switch sign-in off or on, and switch off or lock a school coordinator's access</label>
-          <label class="check"><input type="checkbox" id="set-COORDINATOR_PASSWORD_RESETS" /> School ICT coordinators may give their teachers temporary passwords</label>
-          <label class="check"><input type="checkbox" id="set-COORDINATOR_SIGNIN_CONTROL" /> School ICT coordinators may switch their teachers' sign-in off or on</label>
           <div class="field"><label for="set-TEMP_PASSWORD_DAYS">Temporary passwords work for (days)</label><input type="text" inputmode="numeric" id="set-TEMP_PASSWORD_DAYS" maxlength="3" /><div class="err" id="e-set-TEMP_PASSWORD_DAYS"></div></div>
           <div class="field"><label for="set-SESSION_IDLE_MINUTES">Sign out after this many idle minutes</label><input type="text" inputmode="numeric" id="set-SESSION_IDLE_MINUTES" maxlength="3" /><div class="err" id="e-set-SESSION_IDLE_MINUTES"></div></div>
           <div class="field"><label for="set-SESSION_MAX_HOURS">Sign out after this many hours at most</label><input type="text" inputmode="numeric" id="set-SESSION_MAX_HOURS" maxlength="2" /><div class="err" id="e-set-SESSION_MAX_HOURS"></div></div>
@@ -328,8 +356,14 @@
         <ul class="cards" id="admin-list"></ul>
         <div class="panel" id="add-admin">
           <h2 style="margin-top:0;font-size:18px">Add a sub-admin</h2>
-          <div class="field"><label for="new-displayName">Name</label><input type="text" id="new-displayName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-new-displayName"></div></div>
-          <div class="field"><label for="new-username">Username <span class="hint">— for signing in</span></label><input type="text" id="new-username" maxlength="30" autocapitalize="none" /><div class="err" id="e-new-username"></div></div>
+          <div class="field"><label for="new-staffId">Staff ID <span class="hint">— the sub-admin signs in with it</span></label><input type="text" id="new-staffId" inputmode="numeric" maxlength="15" autocomplete="off" /><div class="hint" id="new-known" aria-live="polite"></div><div class="err" id="e-new-staffId"></div></div>
+              <div id="new-names" class="hidden">
+                <p class="hint">No staff record has this Staff ID yet. Give the names and sex; the rest of the record is filled in later on My record, like a teacher's.</p>
+                <div class="field"><label for="new-surname">Surname</label><input type="text" id="new-surname" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-new-surname"></div></div>
+                <div class="field"><label for="new-firstName">First name</label><input type="text" id="new-firstName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-new-firstName"></div></div>
+                <div class="field"><label for="new-otherNames">Other names <span class="hint">— optional</span></label><input type="text" id="new-otherNames" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-new-otherNames"></div></div>
+                <div class="field"><label for="new-sex">Sex</label><select id="new-sex"><option value="">— choose —</option><option>Male</option><option>Female</option></select><div class="err" id="e-new-sex"></div></div>
+              </div>
           <div class="field"><label for="new-whatsapp">WhatsApp number <span class="hint">— optional</span></label><input type="tel" id="new-whatsapp" maxlength="13" /><div class="err" id="e-new-whatsapp"></div></div>
           <div class="field"><label for="new-email">Email <span class="hint">— optional</span></label><input type="email" id="new-email" maxlength="120" /><div class="err" id="e-new-email"></div></div>
           <fieldset><legend>What they may do</legend><div id="new-perms"></div></fieldset>
@@ -353,8 +387,14 @@
           <div id="handover-form">
             <div class="field"><label for="handover-successor">Successor</label><select id="handover-successor"></select><div class="err" id="e-ho-successor"></div></div>
             <div id="handover-new" class="hidden">
-              <div class="field"><label for="ho-displayName">Name</label><input type="text" id="ho-displayName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ho-displayName"></div></div>
-              <div class="field"><label for="ho-username">Username for them</label><input type="text" id="ho-username" maxlength="30" autocapitalize="none" /><div class="err" id="e-ho-username"></div></div>
+              <div class="field"><label for="ho-staffId">Staff ID <span class="hint">— the new Main Admin signs in with it</span></label><input type="text" id="ho-staffId" inputmode="numeric" maxlength="15" autocomplete="off" /><div class="hint" id="ho-known" aria-live="polite"></div><div class="err" id="e-ho-staffId"></div></div>
+              <div id="ho-names" class="hidden">
+                <p class="hint">No staff record has this Staff ID yet. Give the names and sex; the rest of the record is filled in later on My record, like a teacher's.</p>
+                <div class="field"><label for="ho-surname">Surname</label><input type="text" id="ho-surname" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ho-surname"></div></div>
+                <div class="field"><label for="ho-firstName">First name</label><input type="text" id="ho-firstName" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ho-firstName"></div></div>
+                <div class="field"><label for="ho-otherNames">Other names <span class="hint">— optional</span></label><input type="text" id="ho-otherNames" maxlength="60" class="upper" autocapitalize="characters" /><div class="err" id="e-ho-otherNames"></div></div>
+                <div class="field"><label for="ho-sex">Sex</label><select id="ho-sex"><option value="">— choose —</option><option>Male</option><option>Female</option></select><div class="err" id="e-ho-sex"></div></div>
+              </div>
               <div class="field"><label for="ho-whatsapp">WhatsApp number</label><input type="tel" id="ho-whatsapp" maxlength="13" /><div class="err" id="e-ho-whatsapp"></div></div>
               <div class="field"><label for="ho-email">Email</label><input type="email" id="ho-email" maxlength="120" /><div class="err" id="e-ho-email"></div></div>
             </div>
@@ -427,10 +467,20 @@
         <div class="panel">
           <h2 style="margin-top:0;font-size:18px">Find a teacher</h2>
           <div class="field"><label for="find-q">Name or Staff ID</label><input type="text" id="find-q" maxlength="60" autocomplete="off" /></div>
+          <div class="filters">
+            <div class="field"><label for="find-sex">Sex</label><select id="find-sex"><option value="">All</option></select></div>
+            <div class="field"><label for="find-circuit">Circuit</label><select id="find-circuit"><option value="">All circuits</option></select></div>
+            <div class="field"><label for="find-school">School</label><select id="find-school"><option value="">All schools</option></select></div>
+          </div>
           <div class="err" id="e-find" role="alert"></div>
-          <button type="button" class="btn" id="find-go">Search</button>
+          <div class="more"><button type="button" class="btn" id="find-go">Search</button><button type="button" class="sbtn" id="find-clear">Show all teachers</button></div>
         </div>
         <ul class="cards" id="found-list"></ul>
+        <p class="hint" id="table-count"></p>
+        <div class="table-wrap" id="teacher-table-wrap" tabindex="0" role="region" aria-label="Teachers of the district: scroll sideways for every column">
+          <table class="teacher-table" id="teacher-table"><thead></thead><tbody></tbody></table>
+        </div>
+        <button type="button" class="sbtn hidden" id="table-more">Show more teachers</button>
       </section>
 
       <section id="overview-view" class="hidden">

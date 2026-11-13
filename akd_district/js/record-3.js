@@ -621,9 +621,9 @@ var $ = function (id) { return document.getElementById(id); };
         var ownSchool = view === "school" && S.circuitRole && !!S.mySchool && S.schoolEmis === S.mySchool;
         $("tab-school").setAttribute("aria-selected", String(view === "school" && (!S.circuitRole || ownSchool)));
         $("tab-record").setAttribute("aria-selected", String(view === "record" && !S.subject));
-        $("top-title").textContent = view === "audit" ? "Audit log" : view === "settings" ? "Settings" : view === "admins" ? "Admins" : view === "import" ? "Import teachers" : view === "teachers" ? "Teachers" : view === "overview" ? "Overview" : view === "setup" ? "Set up your school" : view === "circuit" ? (S.admin ? "Circuit" : "My Circuit")
-          : view === "school" ? ((S.circuitRole || S.admin) && !S.schoolMode && !ownSchool ? "School" : "My School")
-          : S.subject ? "Colleague's record" : "My staff record";
+        // The admin's and coordinators' top bar names the portal, not the tab (owner, 2026-11-13): the tab is highlighted below it.
+        $("top-title").textContent = S.admin || S.coordinator ? "Staff Records" : "My staff record";
+        document.body.classList.toggle("wide", view === "teachers");
         window.scrollTo(0, 0);
       }
 
@@ -718,9 +718,9 @@ var $ = function (id) { return document.getElementById(id); };
           .forEach(function (x) { if (x[1]) ul.appendChild(el("li", {}, x[0] + ": " + x[1])); });
         var sx = $("school-export");
         while (sx.firstChild) sx.removeChild(sx.firstChild);
-        if (S.schoolMode && canExport()) {
-          sx.appendChild(exportButton("Download the school's staff list", { kind: "school", emis: r.school.emis }));
-          sx.appendChild(exportButton("Staff list (CSV)", { kind: "school", emis: r.school.emis }, true));
+        if (r.can && r.can.export) {
+          sx.appendChild(exportButton("Download Staff Records (Excel)", { kind: "school", emis: r.school.emis }));
+          sx.appendChild(exportButton("Download Staff Records (CSV)", { kind: "school", emis: r.school.emis }, true));
         }
         renderList();
       }
@@ -1063,8 +1063,8 @@ var $ = function (id) { return document.getElementById(id); };
         var cx = $("circuit-export");
         while (cx.firstChild) cx.removeChild(cx.firstChild);
         if (canExport()) {
-          cx.appendChild(exportButton("Download the circuit's staff list", { kind: "circuit", circuit: r.circuit }));
-          cx.appendChild(exportButton("Staff list (CSV)", { kind: "circuit", circuit: r.circuit }, true));
+          cx.appendChild(exportButton("Download Circuit Staff Records (Excel)", { kind: "circuit", circuit: r.circuit }));
+          cx.appendChild(exportButton("Download Circuit Staff Records (CSV)", { kind: "circuit", circuit: r.circuit }, true));
         }
         renderStats($("circuit-stats"), [["Teachers in the circuit", c.total], ["Schools", r.schools.filter(function (s) { return !s.pending; }).length]]);
         $("circuit-pct").textContent = r.pct + "%";
@@ -1099,10 +1099,9 @@ var $ = function (id) { return document.getElementById(id); };
 
       function schoolCard(s) {
         var li = el("li", { id: "c-" + s.emis });
-        var head = el("div", { "class": "head" });
-        head.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
-        head.appendChild(el("span", { "class": "meta" }, s.pending ? "" : "EMIS " + s.emis));
-        li.appendChild(head);
+        li.appendChild(el("div", { "class": "head" }, ""));
+        li.firstChild.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
+        if (!s.pending) li.appendChild(el("div", { "class": "meta" }, "EMIS " + s.emis));
         var co = s.coordinator;
         li.appendChild(coordinatorLine(co));
         if (s.pending) {
@@ -1122,7 +1121,7 @@ var $ = function (id) { return document.getElementById(id); };
           var open = el("button", { type: "button", "class": "sbtn" }, "Open school");
           open.addEventListener("click", function () { S.schoolEmis = s.emis; loadSchool(); });
           actions.appendChild(open);
-          if (canExport()) actions.appendChild(exportButton("Staff list", { kind: "school", emis: s.emis }));
+          if (canExport()) actions.appendChild(exportButton("Download Staff Records", { kind: "school", emis: s.emis }));
         }
         if (co) {
           var link = waLink(co.phone, coordinatorMessage(s));
@@ -1368,7 +1367,10 @@ var $ = function (id) { return document.getElementById(id); };
       });
 
       /* ---- Official staff list downloads (admins with `exports`, circuit coordinators for their circuit). */
-      function canExport() { return S.circuitRole || !!(S.adminCan && S.adminCan.exports); }
+      function canExport() {
+        if (S.admin) return !!(S.adminCan && S.adminCan.exports);
+        return !!(S.circuitRole && S.circuitSummary && S.circuitSummary.can && S.circuitSummary.can.export);
+      }
 
       function saveBase64(r) {
         var bin = atob(r.base64), bytes = new Uint8Array(bin.length);
@@ -1418,6 +1420,7 @@ var $ = function (id) { return document.getElementById(id); };
           $("tab-admins").classList.toggle("hidden", !r.can["admins.manage"]);
           $("tab-settings").classList.toggle("hidden", !r.can["settings"]);
           $("tab-audit").classList.toggle("hidden", !r.can["audit.view"]);
+          $("tab-record").classList.toggle("hidden", !r.can["record.own"]);
           $("schools-add").classList.toggle("hidden", !r.can["schools.manage"]);
           $("circuit-add").classList.toggle("hidden", !r.can["schools.manage"]);
           if (r.school) {
@@ -1462,8 +1465,8 @@ var $ = function (id) { return document.getElementById(id); };
         var dx = $("district-export");
         while (dx.firstChild) dx.removeChild(dx.firstChild);
         if (canExport()) {
-          dx.appendChild(exportButton("Download the district's staff list", { kind: "district" }));
-          dx.appendChild(exportButton("Staff list (CSV)", { kind: "district" }, true));
+          dx.appendChild(exportButton("Download District Staff List Records (Excel)", { kind: "district" }));
+          dx.appendChild(exportButton("Download District Staff List (CSV)", { kind: "district" }, true));
         }
         var cl = $("circuit-list");
         while (cl.firstChild) cl.removeChild(cl.firstChild);
@@ -1504,7 +1507,7 @@ var $ = function (id) { return document.getElementById(id); };
         var open = el("button", { type: "button", "class": "sbtn" }, "Open circuit");
         open.addEventListener("click", function () { S.circuitName = x.circuit; loadCircuit(true); });
         actions.appendChild(open);
-        if (canExport()) actions.appendChild(exportButton("Staff list", { kind: "circuit", circuit: x.circuit }));
+        if (canExport()) actions.appendChild(exportButton("Download Staff Records", { kind: "circuit", circuit: x.circuit }));
         if (x.coordinator) {
           var link = waLink(x.coordinator.phone, "Hello " + titleWords((x.coordinator.name || "").split(" ")[0]) + ", " + x.circuit +
             " circuit is " + x.pct + "% complete on the staff records portal. " + shareLink(S.overview.link));
@@ -1568,10 +1571,9 @@ var $ = function (id) { return document.getElementById(id); };
         if (!list.length) ul.appendChild(el("li", { "class": "hint" }, "No schools yet."));
         list.forEach(function (s) {
           var li = el("li", { id: "d-" + s.emis });
-          var head = el("div", { "class": "head" });
-          head.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
-          head.appendChild(el("span", { "class": "meta" }, s.circuit));
-          li.appendChild(head);
+          li.appendChild(el("div", { "class": "head" }, ""));
+          li.firstChild.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
+          li.appendChild(el("div", { "class": "meta" }, (s.pending ? "" : "EMIS " + s.emis + " · ") + s.circuit + " circuit"));
           li.appendChild(coordinatorLine(s.coordinator));
           if (s.coordinator) {
             li.appendChild(passwordBlock(s.coordinator, !!S.adminCan["teachers.passwords"]));
@@ -1583,7 +1585,7 @@ var $ = function (id) { return document.getElementById(id); };
             open.addEventListener("click", function () { S.circuitName = null; S.schoolEmis = s.emis; loadSchool(); });
             var actions = el("div", { "class": "actions" });
             actions.appendChild(open);
-            if (canExport()) actions.appendChild(exportButton("Staff list", { kind: "school", emis: s.emis }));
+            if (canExport()) actions.appendChild(exportButton("Download Staff Records", { kind: "school", emis: s.emis }));
             li.appendChild(actions);
           }
           ul.appendChild(li);
@@ -1605,28 +1607,94 @@ var $ = function (id) { return document.getElementById(id); };
         S.subject = null;
         S.fromTeachers = false;
         showView("teachers");
-        $("find-q").focus();
+        if (!S.table) loadTable(false);
       }
 
-      function findTeachers() {
-        var q = $("find-q").value;
+      /* Every teacher of the district in rows (owner, 2026-11-13): the staff list's columns, scrolled
+         sideways and down; sex and circuit filters; a search shows only the teachers it finds. */
+      function loadTable(more) {
+        var q = $("find-q").value.trim();
         $("e-find").textContent = "";
+        if (q.length === 1) { $("e-find").textContent = "Type at least 2 letters of a name, or a Staff ID."; return; }
+        var offset = more && S.table ? S.table.rows.length : 0;
         $("find-go").disabled = true;
-        callServer_("searchTeachers", [S.token, q], function (r) {
-          $("find-go").disabled = false;
-          if (!r || !r.ok) { $("e-find").textContent = (r && r.message) || "Could not search."; return; }
-          S.found = r;
-          renderFound();
-        }, function (e) { $("find-go").disabled = false; fail(e); });
+        $("table-more").disabled = true;
+        $("table-count").textContent = "Loading the teachers…";
+        var done = function () { $("find-go").disabled = false; $("table-more").disabled = false; };
+        callServer_("listDistrictTeachers", [S.token, { q: q, sex: $("find-sex").value, circuit: $("find-circuit").value, school: $("find-school").value }, offset], function (r) {
+          done();
+          if (!r || !r.ok) { $("table-count").textContent = ""; $("e-find").textContent = (r && r.message) || "Could not load the teachers."; return; }
+          fillTableFilters(r);
+          if (more && S.table) { S.table.rows = S.table.rows.concat(r.rows); S.table.more = r.more; S.table.total = r.total; }
+          else S.table = r;
+          renderTable(!more);
+        }, function (e) { done(); $("table-count").textContent = ""; fail(e); });
       }
 
-      function renderFound() {
+      function fillTableFilters(r) {
+        [["find-sex", r.sexes, "All"], ["find-circuit", r.circuits, "All circuits"]].forEach(function (x) {
+          var sel = $(x[0]), keep = sel.value;
+          if (sel.options.length === x[1].length + 1) return;
+          while (sel.firstChild) sel.removeChild(sel.firstChild);
+          sel.appendChild(el("option", { value: "" }, x[2]));
+          x[1].forEach(function (v) { sel.appendChild(el("option", { value: v }, v)); });
+          sel.value = keep;
+        });
+        S.tableSchools = r.schools || [];
+        fillSchoolFilter();
+      }
+
+      /* The School filter lists the chosen circuit's schools only (all of them when no circuit is chosen). */
+      function fillSchoolFilter() {
+        var sel = $("find-school"), keep = sel.value, circuit = $("find-circuit").value;
+        var list = (S.tableSchools || []).filter(function (x) { return !circuit || x.circuit === circuit; });
+        while (sel.firstChild) sel.removeChild(sel.firstChild);
+        sel.appendChild(el("option", { value: "" }, "All schools"));
+        list.forEach(function (x) { sel.appendChild(el("option", { value: x.emis }, x.name + (circuit ? "" : " (" + x.circuit + ")"))); });
+        sel.value = list.some(function (x) { return x.emis === keep; }) ? keep : "";
+      }
+
+      function renderTable(fresh) {
+        var r = S.table, table = $("teacher-table");
+        var head = table.tHead, body = table.tBodies[0];
+        while (head.firstChild) head.removeChild(head.firstChild);
+        while (body.firstChild) body.removeChild(body.firstChild);
+        var hr = el("tr");
+        hr.appendChild(el("th", { "class": "sn", scope: "col" }, "No."));
+        r.columns.forEach(function (c) { hr.appendChild(el("th", { scope: "col" }, c.label)); });
+        head.appendChild(hr);
+        r.rows.forEach(function (row, i) {
+          var tr = el("tr", { tabindex: "0", "aria-label": "Open " + (row.card.name || "Staff ID " + row.card.staffId) });
+          tr.appendChild(el("td", { "class": "sn" }, String(i + 1)));
+          row.cells.forEach(function (v) { tr.appendChild(el("td", {}, v)); });
+          var open = function () { showCard(row.card, tr); };
+          tr.addEventListener("click", open);
+          tr.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); open(); } });
+          body.appendChild(tr);
+        });
+        if (!r.rows.length) {
+          var empty = el("tr");
+          empty.appendChild(el("td", { colspan: String(r.columns.length + 1), "class": "hint" }, $("find-q").value.trim() ? "Nobody found. Check the spelling or the Staff ID." : "No teachers here yet."));
+          body.appendChild(empty);
+        }
+        $("table-count").textContent = r.total ? "Showing " + r.rows.length + " of " + r.total + " teacher" + (r.total === 1 ? "" : "s") +
+          ". Scroll sideways for every column and down for every teacher; tap a row for what you can do." : "";
+        $("table-more").classList.toggle("hidden", !r.more);
+        // One teacher found: their card opens at once; a new list closes any card shown.
+        if (fresh) {
+          var ul = $("found-list");
+          while (ul.firstChild) ul.removeChild(ul.firstChild);
+          if (r.rows.length === 1 && $("find-q").value.trim()) showCard(r.rows[0].card, body.rows[0]);
+        }
+      }
+
+      /* The chosen teacher's card (record, password, sign-in, transfer) above the table. */
+      function showCard(t, tr) {
         var ul = $("found-list");
         while (ul.firstChild) ul.removeChild(ul.firstChild);
-        var r = S.found;
-        if (!r.teachers.length) ul.appendChild(el("li", { "class": "hint" }, "Nobody found. Check the spelling or the Staff ID."));
-        r.teachers.forEach(function (t) { ul.appendChild(foundCard(t)); });
-        if (r.more) ul.appendChild(el("li", { "class": "hint" }, "Only the first 50 are shown. Type more of the name."));
+        ul.appendChild(foundCard(t));
+        [].forEach.call($("teacher-table").tBodies[0].rows, function (x) { x.classList.toggle("picked-row", x === tr); });
+        ul.scrollIntoView({ block: "nearest" });
       }
 
       function foundCard(t) {
@@ -1711,8 +1779,13 @@ var $ = function (id) { return document.getElementById(id); };
       }
 
       $("tab-teachers").addEventListener("click", showTeachers);
-      $("find-go").addEventListener("click", findTeachers);
-      $("find-q").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); findTeachers(); } });
+      $("find-go").addEventListener("click", function () { loadTable(false); });
+      $("find-clear").addEventListener("click", function () { $("find-q").value = ""; $("find-sex").value = ""; $("find-circuit").value = ""; fillSchoolFilter(); $("find-school").value = ""; loadTable(false); });
+      $("find-sex").addEventListener("change", function () { loadTable(false); });
+      $("find-circuit").addEventListener("change", function () { fillSchoolFilter(); loadTable(false); });
+      $("find-school").addEventListener("change", function () { loadTable(false); });
+      $("table-more").addEventListener("click", function () { loadTable(true); });
+      $("find-q").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); loadTable(false); } });
 
       /* ---- Admin Import tab: template → filled file → check → add, or one teacher from a form;
          next steps for passwords. The server checks every row again. */
@@ -1952,7 +2025,7 @@ var $ = function (id) { return document.getElementById(id); };
           head.appendChild(el("strong", {}, a.displayName || a.username));
           head.appendChild(el("span", { "class": "meta" }, a.role === "main" ? "Main Admin" : "Sub-admin"));
           li.appendChild(head);
-          li.appendChild(el("div", { "class": "meta" + (a.status === "Active" ? "" : " warnline") }, "Username " + a.username + " · " + (a.status === "Active" ? "on" : "switched off") +
+          li.appendChild(el("div", { "class": "meta" + (a.status === "Active" ? "" : " warnline") }, (/^\d+$/.test(a.username) ? "Staff ID " : "Username ") + a.username + " · " + (a.status === "Active" ? "on" : "switched off") +
             (a.lastLogin ? " · last sign-in " + dayText(new Date(a.lastLogin)) : " · not signed in yet")));
           if (a.role === "main") { ul.appendChild(li); return; }
           var boxes = el("div", { "class": "perm-boxes" });
@@ -1976,7 +2049,7 @@ var $ = function (id) { return document.getElementById(id); };
               ok: "Create the password" }, function () {
               callServer_("issueAdminTempPassword", [S.token, a.username], function (r) {
                 if (!r || !r.ok) { fail(r); return; }
-                showTempPassword(a.displayName || a.username, a.username, r.temporaryPassword, a.whatsapp, "Your admin username is " + a.username + ".");
+                showTempPassword(a.displayName || a.username, a.username, r.temporaryPassword, a.whatsapp, "You sign in on the Admin tab with " + (/^\d+$/.test(a.username) ? "your Staff ID " : "the username ") + a.username + ".");
               }, fail);
             });
           });
@@ -2030,13 +2103,13 @@ var $ = function (id) { return document.getElementById(id); };
         $("handover-pending").classList.toggle("hidden", !pending);
         $("handover-form").classList.toggle("hidden", !!pending);
         $("handover-code-box").classList.toggle("hidden", !started);
-        if (pending) $("handover-pending-text").textContent = "Handover waiting for " + pending.name + " (username " + pending.to + "), until " +
+        if (pending) $("handover-pending-text").textContent = "Handover waiting for " + pending.name + " (Staff ID " + pending.to + "), until " +
           dayText(new Date(pending.expiresAt), true) + ". Nothing changes until they accept.";
         if (started) {
           $("handover-code").textContent = started.code;
           $("handover-emailed").textContent = started.emailed ? "The code was emailed to " + started.pending.email + "." : "No email was sent: send the code by WhatsApp.";
           var link = waShare(started.pending.whatsapp, "Hello " + started.pending.name + ", I am handing over the Main Admin role of the staff records portal to you. Open " +
-            (shareLink(started.link) || "the portal") + ", choose the Admin tab, then \"I have a handover code\". Username: " + started.pending.to + " · Code: " + started.code +
+            (shareLink(started.link) || "the portal") + ", choose the Admin tab, then \"I have a handover code\". Staff ID: " + started.pending.to + " · Code: " + started.code +
             " (works once, for 72 hours). You will choose your own password.");
           $("handover-wa").href = link;
           $("handover-wa").setAttribute("aria-disabled", "false");
@@ -2064,10 +2137,12 @@ var $ = function (id) { return document.getElementById(id); };
 
       $("handover-successor").addEventListener("change", function () { $("handover-new").classList.toggle("hidden", $("handover-successor").value !== "new"); });
       $("handover-start").addEventListener("click", function () {
-        ["successor", "username", "displayName", "whatsapp", "email", "outgoing"].forEach(function (k) { $("e-ho-" + k).textContent = ""; });
-        var form = { successor: $("handover-successor").value, username: $("ho-username").value, displayName: $("ho-displayName").value,
-          whatsapp: $("ho-whatsapp").value, email: $("ho-email").value,
-          outgoing: document.querySelector("input[name=ho-outgoing]:checked").value };
+        PERSON_FIELDS.concat(["successor", "whatsapp", "email", "outgoing"]).forEach(function (k) { $("e-ho-" + k).textContent = ""; });
+        var form = personForm("ho");
+        form.successor = $("handover-successor").value;
+        form.whatsapp = $("ho-whatsapp").value;
+        form.email = $("ho-email").value;
+        form.outgoing = document.querySelector("input[name=ho-outgoing]:checked").value;
         if (!form.successor) { $("e-ho-successor").textContent = "Choose the successor."; return; }
         callServer_("startHandover", [S.token, form, $("handover-password").value], handoverStarted, fail);
       });
@@ -2093,8 +2168,21 @@ var $ = function (id) { return document.getElementById(id); };
           S.settings = r;
           $("waves-section").classList.toggle("hidden", !!S.schoolMode);
           $("set-district-code-field").classList.toggle("hidden", !!S.schoolMode);
+          $("privileges-section").classList.toggle("hidden", !!S.schoolMode); // one school: no coordinators
           renderSettings();
         }, fail);
+      }
+
+      /* The coordinators' rights the Main Admin may take away (Settings.gs); all on by default. */
+      var COORDINATOR_SWITCHES = ["COORDINATOR_PASSWORD_RESETS", "COORDINATOR_SIGNIN_CONTROL", "CIRCUIT_PASSWORD_RESETS", "CIRCUIT_SIGNIN_CONTROL", "COORDINATOR_EDIT_RECORDS", "COORDINATOR_SERVICE_STATUS", "COORDINATOR_EXPORT", "CIRCUIT_EDIT_RECORDS", "CIRCUIT_SERVICE_STATUS", "CIRCUIT_NAME_COORDINATORS", "CIRCUIT_EXPORT"];
+
+      /* What a teacher would receive, so the admin sees that the portal fills in the curly brackets. */
+      function reminderExample() {
+        var t = { firstName: "AMA", pct: 60, missingSections: ["Bank details", "Next of kin"], status: "Partial" };
+        var saved = S.summary;
+        S.summary = { reminder: $("set-REMINDER_MESSAGE").value, link: (S.settings && S.settings.values.PORTAL_LINK) || "" };
+        $("reminder-example").textContent = "Example of what a teacher receives: " + reminderFor(t);
+        S.summary = saved;
       }
 
       function renderSettings() {
@@ -2112,7 +2200,8 @@ var $ = function (id) { return document.getElementById(id); };
           : "Leave it empty to send the Google (script.google.com) link.";
         $("set-MAINTENANCE_MODE").checked = v.MAINTENANCE_MODE === "true";
         $("set-MAINTENANCE_MESSAGE").value = v.MAINTENANCE_MESSAGE;
-        ["COORDINATOR_PASSWORD_RESETS", "COORDINATOR_SIGNIN_CONTROL", "CIRCUIT_PASSWORD_RESETS", "CIRCUIT_SIGNIN_CONTROL"].forEach(function (k) { $("set-" + k).checked = v[k] !== "false"; });
+        COORDINATOR_SWITCHES.forEach(function (k) { $("set-" + k).checked = v[k] !== "false"; });
+        reminderExample();
         ["TEMP_PASSWORD_DAYS", "SESSION_IDLE_MINUTES", "SESSION_MAX_HOURS"].forEach(function (k) { $("set-" + k).value = v[k]; });
         var waves = $("set-waves"), open = v.ALLOWED_CIRCUITS ? v.ALLOWED_CIRCUITS.split(",") : [];
         while (waves.firstChild) waves.removeChild(waves.firstChild);
@@ -2151,11 +2240,11 @@ var $ = function (id) { return document.getElementById(id); };
         var out = {
           REGION: $("set-REGION").value, MMDA: $("set-MMDA").value, DISTRICT_CODE: $("set-DISTRICT_CODE").value.trim(), ACADEMIC_YEAR: $("set-ACADEMIC_YEAR").value, TERM: $("set-TERM").value, REMINDER_MESSAGE: $("set-REMINDER_MESSAGE").value, PORTAL_LINK: $("set-PORTAL_LINK").value.trim(),
           MAINTENANCE_MODE: String($("set-MAINTENANCE_MODE").checked), MAINTENANCE_MESSAGE: $("set-MAINTENANCE_MESSAGE").value,
-          COORDINATOR_PASSWORD_RESETS: String($("set-COORDINATOR_PASSWORD_RESETS").checked), COORDINATOR_SIGNIN_CONTROL: String($("set-COORDINATOR_SIGNIN_CONTROL").checked),
-          CIRCUIT_PASSWORD_RESETS: String($("set-CIRCUIT_PASSWORD_RESETS").checked), CIRCUIT_SIGNIN_CONTROL: String($("set-CIRCUIT_SIGNIN_CONTROL").checked), ALLOWED_CIRCUITS: ticked($("set-waves")).join(","),
+          ALLOWED_CIRCUITS: ticked($("set-waves")).join(","),
           REQUIRED_FIELDS: $("set-req-template").checked ? "" : ticked($("set-required")).join(",")
         };
         ["TEMP_PASSWORD_DAYS", "SESSION_IDLE_MINUTES", "SESSION_MAX_HOURS"].forEach(function (k) { out[k] = $("set-" + k).value; });
+        COORDINATOR_SWITCHES.forEach(function (k) { out[k] = String($("set-" + k).checked); });
         return out;
       }
 
@@ -2193,6 +2282,7 @@ var $ = function (id) { return document.getElementById(id); };
       $("set-req-template").addEventListener("change", function () {
         [].forEach.call($("set-required").querySelectorAll("input"), function (x) { x.disabled = $("set-req-template").checked; });
       });
+      $("set-REMINDER_MESSAGE").addEventListener("input", reminderExample);
       $("set-save").addEventListener("click", function () {
         [].forEach.call(document.querySelectorAll("#settings-view .err[id^=e-set-]"), function (x) { x.textContent = ""; });
         callServer_("saveSettings", [S.token, collectSettings()], function (r) {
@@ -2205,25 +2295,55 @@ var $ = function (id) { return document.getElementById(id); };
         }, fail);
       });
       $("tab-admins").addEventListener("click", loadAdmins);
-      /* A username already in the list is refused at once (the server refuses it too, and also old ones). */
-      function usernameTaken() {
-        var u = $("new-username").value.trim().toLowerCase();
-        var taken = !!u && ((S.admins && S.admins.admins) || []).some(function (a) { return String(a.username).toLowerCase() === u; });
-        $("e-new-username").textContent = taken ? "The username \"" + u + "\" is already used by another admin. Choose a different one." : "";
-        $("new-admin-save").disabled = taken;
-        return taken;
+      /* Admins are named by Staff ID (owner, 2026-11-13). Looking it up shows whose record it is, or asks
+         for the names and sex of someone the portal has no record of yet; the server checks again. */
+      var PERSON_FIELDS = ["staffId", "surname", "firstName", "otherNames", "sex"];
+      function personLookup(prefix, saveButton) {
+        var input = $(prefix + "-staffId"), asked = "";
+        var check = function () {
+          var id = input.value.replace(/\s+/g, "");
+          $("e-" + prefix + "-staffId").textContent = "";
+          $(prefix + "-known").textContent = "";
+          if (!/^\d{1,15}$/.test(id)) { $(prefix + "-names").classList.add("hidden"); asked = ""; if (saveButton) saveButton.disabled = false; return; }
+          if (id === asked) return;
+          asked = id;
+          callServer_("findStaffForAdmin", [S.token, id], function (r) {
+            if (!r || !r.ok || input.value.replace(/\s+/g, "") !== id) return;
+            $(prefix + "-names").classList.toggle("hidden", r.found);
+            $(prefix + "-known").textContent = r.found ? "Staff record found: " + r.name : "";
+            if (r.isAdmin) $("e-" + prefix + "-staffId").textContent = "Staff ID " + id + " already has an admin account.";
+            if (saveButton) saveButton.disabled = !!r.isAdmin;
+          }, function () { /* the save checks it anyway */ });
+        };
+        input.addEventListener("change", check);
+        input.addEventListener("blur", check);
+        input.addEventListener("input", function () { if (input.value.replace(/\s+/g, "").length >= 6) check(); });
       }
-      $("new-username").addEventListener("input", usernameTaken);
+      function personForm(prefix) {
+        var out = {};
+        PERSON_FIELDS.forEach(function (k) { out[k] = $(prefix + "-" + k).value; });
+        return out;
+      }
+      function clearPerson(prefix) {
+        PERSON_FIELDS.forEach(function (k) { $(prefix + "-" + k).value = ""; $("e-" + prefix + "-" + k).textContent = ""; });
+        $(prefix + "-known").textContent = "";
+        $(prefix + "-names").classList.add("hidden");
+      }
+      PERSON_FIELDS.slice(1, 4).forEach(function (k) { upperInput($("new-" + k)); upperInput($("ho-" + k)); });
+      personLookup("new", $("new-admin-save"));
+      personLookup("ho", null);
       $("new-admin-save").addEventListener("click", function () {
-        ["username", "displayName", "whatsapp", "email"].forEach(function (k) { $("e-new-" + k).textContent = ""; });
-        if (usernameTaken()) { $("new-username").focus(); return; }
-        var form = { username: $("new-username").value, displayName: $("new-displayName").value, whatsapp: $("new-whatsapp").value,
-          email: $("new-email").value, permissions: ticked($("new-perms")) };
+        PERSON_FIELDS.concat(["whatsapp", "email"]).forEach(function (k) { $("e-new-" + k).textContent = ""; });
+        var form = personForm("new");
+        form.whatsapp = $("new-whatsapp").value;
+        form.email = $("new-email").value;
+        form.permissions = ticked($("new-perms"));
         callServer_("addSubAdmin", [S.token, form], function (r) {
           if (r && r.ok) {
-            ["new-username", "new-displayName", "new-whatsapp", "new-email"].forEach(function (id) { $(id).value = ""; });
+            clearPerson("new");
+            ["new-whatsapp", "new-email"].forEach(function (id) { $(id).value = ""; });
             loadAdmins();
-            showTempPassword(form.displayName, r.username, r.temporaryPassword, r.whatsapp, "Your admin username is " + r.username + ".");
+            showTempPassword(r.name, r.username, r.temporaryPassword, r.whatsapp, "You sign in on the Admin tab with your Staff ID " + r.staffId + ".");
             return;
           }
           if (r && r.code === "INVALID" && r.errors) Object.keys(r.errors).forEach(function (k) { if ($("e-new-" + k)) $("e-new-" + k).textContent = r.errors[k]; });

@@ -176,8 +176,8 @@
 
             <form id="panel-admin" class="hidden" role="tabpanel" aria-labelledby="tab-admin" novalidate>
               <div class="field">
-                <label for="a-user">Username</label>
-                <input type="text" id="a-user" autocomplete="username" autocapitalize="none" maxlength="40" />
+                <label for="a-user">Staff ID</label>
+                <input type="text" id="a-user" inputmode="numeric" autocomplete="username" autocapitalize="none" maxlength="40" />
               </div>
               <div class="field">
                 <label for="a-pass">Password</label>
@@ -192,7 +192,7 @@
           <form id="recover" class="hidden" novalidate>
             <div class="alert warn">Main Admin only: use the recovery key you wrote down when you first signed in.</div>
             <div id="recover-message" class="hidden" role="alert"></div>
-            <div class="field"><label for="r-user">Username</label><input type="text" id="r-user" autocapitalize="none" maxlength="40" /></div>
+            <div class="field"><label for="r-user">Staff ID</label><input type="text" id="r-user" inputmode="numeric" autocapitalize="none" maxlength="40" /></div>
             <div class="field"><label for="r-key">Recovery key</label><input type="text" id="r-key" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
             <div class="field"><label for="r-new">New password <span class="hint">— 8+ characters with a capital, a small letter, a number and a symbol (! # $ %)</span></label>
               <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="r-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="r-new">Show</button></div></div>
@@ -202,9 +202,9 @@
           </form>
 
           <form id="accept" class="hidden" novalidate>
-            <div class="alert warn">You are taking over as Main Admin. Enter the username and the code you were sent, then choose your own password.</div>
+            <div class="alert warn">You are taking over as Main Admin. Enter your Staff ID and the code you were sent, then choose your own password.</div>
             <div id="accept-message" class="hidden" role="alert" data-banner></div>
-            <div class="field"><label for="h-user">Username</label><input type="text" id="h-user" autocapitalize="none" maxlength="40" /></div>
+            <div class="field"><label for="h-user">Staff ID</label><input type="text" id="h-user" inputmode="numeric" autocapitalize="none" maxlength="40" /></div>
             <div class="field"><label for="h-code">Handover code</label><input type="text" id="h-code" autocapitalize="none" autocomplete="off" maxlength="40" placeholder="xxxxx-xxxxx-xxxxx-xxxxx" /></div>
             <div class="field"><label for="h-new">New password <span class="hint">— 8+ characters with a capital, a small letter, a number and a symbol (! # $ %)</span></label>
               <div class="pw"><input type="password" autocapitalize="none" autocorrect="off" spellcheck="false" id="h-new" autocomplete="new-password" maxlength="128" /><button type="button" class="show-pw" aria-controls="h-new">Show</button></div></div>
