@@ -1442,6 +1442,9 @@ var $ = function (id) { return document.getElementById(id); };
       }
 
       /* Big totals at the top of the district, circuit and school pages (owner, 2026-11-11). */
+      /* The district office is kept like a school under a reserved code (Schools.gs OFFICE_EMIS_). */
+      function isOffice(emis) { return emis === "0000000000"; }
+
       function renderStats(ul, items) {
         while (ul.firstChild) ul.removeChild(ul.firstChild);
         items.forEach(function (x) {
@@ -1454,7 +1457,7 @@ var $ = function (id) { return document.getElementById(id); };
 
       function renderOverview() {
         var r = S.overview, c = r.counts;
-        renderStats($("district-stats"), [["Teachers in the district", c.total], ["Schools", r.schools.filter(function (s) { return !s.pending; }).length], ["Circuits", r.circuits.length]]);
+        renderStats($("district-stats"), [["Teachers in the district", c.total], ["Schools", r.schools.filter(function (s) { return !s.pending && !isOffice(s.emis); }).length], ["Circuits", r.circuits.length]]);
         showWho((r.district.name || r.district.mmda || "District") + (r.main ? " · Main Admin" : " · Admin"), r.termLabel);
         $("district-name").textContent = r.district.mmda || "District";
         $("district-pct").textContent = r.pct + "%";
@@ -1578,7 +1581,7 @@ var $ = function (id) { return document.getElementById(id); };
           var li = el("li", { id: "d-" + s.emis });
           li.appendChild(el("div", { "class": "head" }, ""));
           li.firstChild.appendChild(el("strong", {}, s.pending ? "School to be set up" : s.name));
-          li.appendChild(el("div", { "class": "meta" }, (s.pending ? "" : "EMIS " + s.emis + " · ") + s.circuit + " circuit"));
+          li.appendChild(el("div", { "class": "meta" }, isOffice(s.emis) ? "District office (no EMIS code, no circuit)" : (s.pending ? "" : "EMIS " + s.emis + " · ") + s.circuit + " circuit"));
           li.appendChild(coordinatorLine(s.coordinator));
           if (s.coordinator) {
             li.appendChild(passwordBlock(s.coordinator, !!S.adminCan["teachers.passwords"]));
@@ -1877,7 +1880,7 @@ var $ = function (id) { return document.getElementById(id); };
         var f = $("import-file").files && $("import-file").files[0];
         if (!f) { $("e-import").textContent = "Choose the filled template file first."; return; }
         if (!/\.(xlsx|csv)$/i.test(f.name)) { $("e-import").textContent = "Choose an .xlsx (the template) or .csv file."; return; }
-        if (f.size > IMPORT_MAX_BYTES) { $("e-import").textContent = "The file is too big. Keep at most 1,000 teachers in one file."; return; }
+        if (f.size > IMPORT_MAX_BYTES) { $("e-import").textContent = "The file is too big. Keep at most 3,000 teachers in one file."; return; }
         var reader = new FileReader();
         reader.onload = function () { then({ fileName: f.name, base64: String(reader.result).replace(/^data:[^,]*,/, "") }); };
         reader.onerror = function () { $("e-import").textContent = "The file could not be read. Choose it again."; };
