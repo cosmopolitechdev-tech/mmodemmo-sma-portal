@@ -1131,16 +1131,6 @@ function _renderEducationEditor(group, fc, currentVal, readOnly) {
           }),
         ),
       );
-      // Professional or Academic comes first: the qualification depends on it.
-      grid.appendChild(
-        cell(
-          "Professional or Academic",
-          chooser(cfg.types, r.qualification_type, "— Choose —", function (v) {
-            r.qualification_type = v;
-            save();
-          }),
-        ),
-      );
       var qual = document.createElement("input");
       qual.type = "text";
       qual.className = "form-control";
@@ -1153,6 +1143,16 @@ function _renderEducationEditor(group, fc, currentVal, readOnly) {
         save();
       });
       grid.appendChild(cell("Qualification Obtained", qual));
+      // Qualification comes first; Professional or Academic then describes it.
+      grid.appendChild(
+        cell(
+          "Professional or Academic",
+          chooser(cfg.types, r.qualification_type, "— Choose —", function (v) {
+            r.qualification_type = v;
+            save();
+          }),
+        ),
+      );
       card.appendChild(grid);
       list.appendChild(card);
     });
