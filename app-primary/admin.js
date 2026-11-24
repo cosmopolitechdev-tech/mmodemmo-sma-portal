@@ -5063,7 +5063,7 @@ function buildOtherLevyRecordsSection(container) {
     _olEl(
       "div",
       { className: "section-header__subtitle" },
-      "School-named levies and daily fees added in the desktop app (Admission & Daily Fees → Custom Levies & Fees). Current term only.",
+      "School-named levies and daily fees added in the desktop app (Admission & Daily Fees → Levy Rate Setup → Other Levies & Fees). Current term only.",
     ),
   );
   header.appendChild(titles);
@@ -5109,7 +5109,7 @@ function buildOtherLevyRecordsSection(container) {
     });
     if (OTHER_LEVIES.length === 0) {
       loadBtn.disabled = true;
-      _olMessage("No other levies yet. Add them in the desktop app: Admission & Daily Fees → Custom Levies & Fees.");
+      _olMessage("No other levies yet. Add them in the desktop app: Admission & Daily Fees → Levy Rate Setup → Other Levies & Fees.");
       return;
     }
     levySel.dispatchEvent(new Event("change"));

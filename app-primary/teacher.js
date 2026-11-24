@@ -740,7 +740,12 @@ function loadBehaviorStudents() {
               forcedLogout("session_updated");
               return;
             }
-            BEHAVIOR_EXISTING = existResult && existResult.records ? existResult.records : {};
+            if (!existResult || !existResult.success) {
+              hideSpinner();
+              showSavedMarksLoadFailure(["behaviorCardWrapper"], ["btnSaveBehavior"], existResult && existResult.message);
+              return;
+            }
+            BEHAVIOR_EXISTING = existResult.records || {};
 
             averagesCall.then(
               function (avgResult) {
@@ -801,16 +806,7 @@ function loadBehaviorStudents() {
           },
           function () {
             hideSpinner();
-            BEHAVIOR_EXISTING = {};
-            BEHAVIOR_CUMULATIVE_AVERAGES = {};
-            BEHAVIOR_CARD_CONTROLLER = renderBehaviorCardView(
-              document.getElementById("behaviorCardWrapper"),
-              BEHAVIOR_STUDENTS,
-              {},
-              BEHAVIOR_OPTIONS,
-              {},
-            );
-            document.getElementById("btnSaveBehavior").disabled = false;
+            showSavedMarksLoadFailure(["behaviorCardWrapper"], ["btnSaveBehavior"]);
           },
         );
       },
@@ -3273,6 +3269,22 @@ function _clearSbaGridState() {
   _clearStudentNameSearch("sba");
 }
 
+// A failed load must not show an empty grid: teachers read that as lost marks and re-enter them.
+function showSavedMarksLoadFailure(wrapperIds, buttonIds, message) {
+  wrapperIds.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = "";
+  });
+  buttonIds.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+  showToast(
+    message || "Saved marks could not be loaded just now. Nothing was lost - please click Load again.",
+    "error",
+  );
+}
+
 // SBA TAB — LOAD STUDENTS (load-for-update)
 
 // Loads students into the SBA Marks grid for the selected class and subject.
@@ -3381,7 +3393,11 @@ function loadSbaStudents() {
             document.getElementById("btnDeleteSba").disabled = true;
             return;
           }
-          SBA_EXISTING = existResult && existResult.records ? existResult.records : {};
+          if (!existResult || !existResult.success) {
+            showSavedMarksLoadFailure(["sbaGridWrapper", "sbaCardWrapper"], ["btnSaveSba", "btnDeleteSba"], existResult && existResult.message);
+            return;
+          }
+          SBA_EXISTING = existResult.records || {};
           renderSbaGrid(
             document.getElementById("sbaGridWrapper"),
             SBA_STUDENTS,
@@ -3400,17 +3416,7 @@ function loadSbaStudents() {
         },
         function () {
           hideSpinner();
-          SBA_EXISTING = {};
-          renderSbaGrid(document.getElementById("sbaGridWrapper"), SBA_STUDENTS, {}, false);
-          // capture the card-view controller so student search can jump to it.
-          SBA_CARD_CONTROLLER = renderSbaCardView(
-            document.getElementById("sbaCardWrapper"),
-            SBA_STUDENTS,
-            {},
-            false,
-          );
-          document.getElementById("btnSaveSba").disabled = false;
-          document.getElementById("btnDeleteSba").disabled = false;
+          showSavedMarksLoadFailure(["sbaGridWrapper", "sbaCardWrapper"], ["btnSaveSba", "btnDeleteSba"]);
         },
       );
     },
