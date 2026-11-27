@@ -3348,6 +3348,12 @@ function buildClassAssignmentsSection(container) {
   );
   // SBA Assignments panel (and its "Load Subjects_Reference then rebuild dropdowns" /
   // loadSbaAssignments() init calls) moved to buildSbaRecordsSection() below — see that function.
+  var _attStaffBox = document.getElementById("attAssignStaff");
+  if (_attStaffBox) {
+    _attStaffBox.addEventListener("change", function () {
+      _assignGridRender("att");
+    });
+  }
 
   loadAssignments();
 
@@ -3357,7 +3363,10 @@ function buildClassAssignmentsSection(container) {
     callServer("getTeachersForAdmin", {}, ADMIN_TOKEN).then(
       function (r) {
         if (_checkAuthCode(r)) return;
-        if (r && r.success) TEACHERS_CACHE = r.teachers || [];
+        if (r && r.success) {
+          TEACHERS_CACHE = r.teachers || [];
+          _assignGridRender("att");
+        }
       },
       function () {
         /* silent — auto-select simply won't fire until cache populates on next visit */
@@ -3600,6 +3609,9 @@ function _buildAssignmentPanel(type, prefix) {
     '<option value="B">B</option><option value="C">C</option><option value="D">D</option>' +
     "</select>" +
     "</div>" +
+    (prefix === "att"
+      ? '<details style="margin-top:var(--space-3);"><summary style="cursor:pointer;font-size:var(--font-size-sm);">Assign one at a time</summary>'
+      : "") +
     '<div class="form-group">' +
     '<label class="form-label">Class Level</label>' +
     '<select class="form-control" id="' +
@@ -3611,6 +3623,7 @@ function _buildAssignmentPanel(type, prefix) {
     "', '" +
     prefix +
     "')\">✅ Assign</button>" +
+    (prefix === "att" ? "</details>" : "") +
     "</div>" +
     "</div>" +
     '<div class="assignment-panel__table-col">' +
@@ -3619,6 +3632,9 @@ function _buildAssignmentPanel(type, prefix) {
     'AssignTable"><div class="loading-state"><div class="spinner spinner--sm"></div></div></div>' +
     "</div>" +
     "</div>" +
+    (prefix === "att"
+      ? '<div id="attAssignGrid" style="padding:var(--space-4);border-top:1px solid var(--border);"></div>'
+      : "") +
     "</div>"
   );
 }
@@ -3643,6 +3659,7 @@ function _getTeacherSchoolLevelFromCache(staffId) {
 function _autoSelectSchoolLevelByStaffId(prefix) {
   var staffInput = document.getElementById(prefix + "AssignStaff");
   var staffId = staffInput ? staffInput.value.trim() : "";
+  if (prefix === "att") _assignGridRender("att");
   var level = _getTeacherSchoolLevelFromCache(staffId);
   if (!level) return;
   var radios = document.querySelectorAll('input[name="' + prefix + 'Level"]');
@@ -3657,6 +3674,7 @@ function _autoSelectSchoolLevelByStaffId(prefix) {
 function _autoSelectSbaSchoolLevelByStaffId() {
   var staffInput = document.getElementById("sbaAssignStaff");
   var staffId = staffInput ? staffInput.value.trim() : "";
+  _assignGridRender("sba");
   var level = _getTeacherSchoolLevelFromCache(staffId);
   if (!level) return;
   var radios = document.querySelectorAll('input[name="sbaAssignLevel"]');
@@ -3688,6 +3706,7 @@ function rebuildAssignClassLevel(prefix) {
     o.textContent = lvl;
     clEl.appendChild(o);
   });
+  if (prefix === "att") _assignGridRender("att");
 }
 
 function loadAssignments() {
@@ -3705,6 +3724,8 @@ function loadAssignments() {
         showToast("Could not load assignments.", "error");
         return;
       }
+      ADMIN_DUTY_ASSIGNMENTS_CACHE = r.assignments || [];
+      _assignGridRender("att");
       _renderAssignmentTable(r.assignments || [], "Attendance", "att");
       _renderAssignmentTable(r.assignments || [], "Daily_Levy", "levy");
       _renderAssignmentTable(r.assignments || [], "Admission_Fee", "admfee");
@@ -3835,6 +3856,7 @@ function rebuildSbaAssignClassLevel() {
     clEl.appendChild(o);
   });
   rebuildSbaAssignSubject();
+  _assignGridRender("sba");
 }
 
 // Rebuilds the Subject dropdown for the selected Class Level via
@@ -3876,6 +3898,7 @@ function loadSbaAssignments() {
       // reloads (after page load, after a successful Assign, and after a Revoke).
       ADMIN_SBA_ASSIGNMENTS_CACHE = r.assignments || [];
       _renderSbaAssignmentTable(r.assignments || []);
+      _assignGridRender("sba");
     },
     function () {
       setHtml(
@@ -4145,6 +4168,510 @@ function doSbaAssign() {
       showToast(friendlyErrorFrontend(e ? e.message : ""), "error");
     },
   );
+}
+
+// SECTION: TICK-BOX ASSIGNMENT GRID
+// Pick a teacher once, then tick Attendance classes ("att") or class + subject pairs ("sba") and
+// save them together. Changes go through the same server checks as the one-at-a-time form.
+
+var ADMIN_DUTY_ASSIGNMENTS_CACHE = [];
+var ASSIGN_GRID_BATCH_ = 10;
+var ASSIGN_GRID_STATE_ = { sba: { staffId: "", desired: {} }, att: { staffId: "", desired: {} } };
+
+function _assignGridCall(staffId, kind, adds, removeIds) {
+  return callServer(
+    "saveTeacherAssignmentGrid",
+    { staffId: staffId, kind: kind === "sba" ? "sba" : "attendance", adds: adds, removeIds: removeIds },
+    ADMIN_TOKEN,
+  );
+}
+
+function _assignGridNormId(v) {
+  return String(v === null || v === undefined ? "" : v)
+    .trim()
+    .replace(/\.0+$/, "")
+    .replace(/^0+(?=\d)/, "");
+}
+
+function _assignGridTeacher(staffId) {
+  var id = _assignGridNormId(staffId);
+  if (!id) return null;
+  return (
+    TEACHERS_CACHE.find(function (t) {
+      return _assignGridNormId(t.staff_id) === id;
+    }) || null
+  );
+}
+
+function _assignGridTeacherName(t) {
+  return t ? [t.first_name, t.middle_name, t.surname].filter(Boolean).join(" ") : "";
+}
+
+/* Rows in the Class Level dropdown's order: [{classLevel, items: [{key, classLevel, subjectId, label}]}]. */
+function _assignGridRows(kind) {
+  var clEl = document.getElementById(kind === "sba" ? "sbaAssignClassLevel" : "attClassLevel");
+  if (!clEl) return [];
+  var levels = Array.prototype.map
+    .call(clEl.options, function (o) {
+      return o.value;
+    })
+    .filter(function (v) {
+      return v && v !== "ALL_CLASSES";
+    });
+  return levels.map(function (lvl) {
+    if (kind !== "sba") {
+      return { classLevel: lvl, items: [{ key: lvl, classLevel: lvl, subjectId: "", label: lvl }] };
+    }
+    var subjects = getSubjectsForClassLevel(lvl, ADMIN_SBA_GHANAIAN_LANG, ADMIN_SBA_SUBJECTS_REF);
+    return {
+      classLevel: lvl,
+      items: subjects
+        .filter(function (s) {
+          return s.subjectId !== null && s.subjectId !== undefined && String(s.subjectId) !== "";
+        })
+        .map(function (s) {
+          return {
+            key: lvl + "|" + String(s.subjectId),
+            classLevel: lvl,
+            subjectId: String(s.subjectId),
+            label: s.displayName,
+          };
+        }),
+    };
+  });
+}
+
+/* {key: [active assignment rows]} for every teacher, from the lists the tables already loaded. */
+function _assignGridHeld(kind) {
+  var held = {};
+  var list =
+    kind === "sba"
+      ? ADMIN_SBA_ASSIGNMENTS_CACHE || []
+      : (ADMIN_DUTY_ASSIGNMENTS_CACHE || []).filter(function (a) {
+          return a.assignment_type === "Attendance";
+        });
+  list.forEach(function (a) {
+    var key = kind === "sba" ? a.class_level + "|" + String(a.subject_id) : String(a.class_level);
+    (held[key] = held[key] || []).push(a);
+  });
+  return held;
+}
+
+/* One item's state for the selected teacher: {mine, ticked, otherName}. */
+function _assignGridCell(kind, item, held) {
+  var state = ASSIGN_GRID_STATE_[kind];
+  var rows = held[item.key] || [];
+  var mine = rows.find(function (a) {
+    return _assignGridNormId(a.staff_id) === _assignGridNormId(state.staffId);
+  });
+  var other = rows.find(function (a) {
+    return _assignGridNormId(a.staff_id) !== _assignGridNormId(state.staffId);
+  });
+  var want = state.desired[item.key];
+  return {
+    mine: mine || null,
+    ticked: want ? want.on : !!mine,
+    otherName: other ? _assignGridTeacherName(_assignGridTeacher(other.staff_id)) || "Staff ID " + other.staff_id : "",
+  };
+}
+
+function _assignGridSet(kind, item, on, held) {
+  var state = ASSIGN_GRID_STATE_[kind];
+  var cell = _assignGridCell(kind, item, held);
+  if (cell.otherName && !cell.mine) return;
+  if (on === !!cell.mine) delete state.desired[item.key];
+  else state.desired[item.key] = { on: on, item: item };
+}
+
+/* Redraws the grid for whichever teacher is in the panel's Staff ID box. */
+function _assignGridRender(kind) {
+  var box = document.getElementById(kind + "AssignGrid");
+  if (!box) return;
+  var state = ASSIGN_GRID_STATE_[kind];
+  var input = document.getElementById(kind === "sba" ? "sbaAssignStaff" : "attAssignStaff");
+  var staffId = input ? input.value.trim() : "";
+  if (_assignGridNormId(staffId) !== _assignGridNormId(state.staffId)) {
+    state.staffId = staffId;
+    state.desired = {};
+  }
+  var focusKey = document.activeElement && document.activeElement.getAttribute
+    ? document.activeElement.getAttribute("data-grid-key")
+    : null;
+  box.textContent = "";
+  var what = kind === "sba" ? "classes and subjects" : "Attendance classes";
+  var teacher = _assignGridTeacher(staffId);
+  var note = function (text) {
+    var p = document.createElement("p");
+    p.className = "text-muted";
+    p.style.cssText = "font-size:var(--font-size-sm);margin:0;";
+    p.textContent = text;
+    box.appendChild(p);
+  };
+  if (!teacher) {
+    note("✔ Quick assign: search for a teacher above to tick all their " + what + " at once.");
+    return;
+  }
+  var status = String(teacher.account_status || "");
+  var blocked = status === "Locked" || status === "Inactive";
+  var held = _assignGridHeld(kind);
+  var rows = _assignGridRows(kind);
+
+  var title = document.createElement("div");
+  title.style.cssText = "font-weight:600;margin-bottom:var(--space-2);";
+  title.textContent =
+    "Tick the " + what + " for " + _assignGridTeacherName(teacher) + " (" + teacher.staff_id + ")";
+  box.appendChild(title);
+  if (blocked) {
+    note("This account is " + status + ". " + (status === "Locked" ? "Unlock" : "Reactivate") + " it in All Teachers first.");
+    return;
+  }
+
+  var makeBox = function (item, label) {
+    var cell = _assignGridCell(kind, item, held);
+    var lab = document.createElement("label");
+    lab.style.cssText =
+      "display:inline-flex;align-items:center;gap:6px;margin:0 var(--space-4) var(--space-2) 0;" +
+      "font-size:var(--font-size-sm);cursor:pointer;";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = cell.ticked;
+    cb.setAttribute("data-grid-key", item.key);
+    var text = label;
+    if (cell.otherName && !cell.mine) {
+      cb.disabled = true;
+      lab.style.cursor = "not-allowed";
+      lab.style.color = "var(--text-muted)";
+      lab.title = "Already assigned to " + cell.otherName + ". Revoke it in the list first.";
+      text += " (" + cell.otherName + ")";
+    } else if (cell.ticked !== !!cell.mine) {
+      lab.style.fontWeight = "600";
+      lab.style.color = cell.ticked ? "var(--primary)" : "var(--border-error)";
+    }
+    cb.addEventListener("change", function () {
+      _assignGridSet(kind, item, cb.checked, held);
+      _assignGridRender(kind);
+    });
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(text));
+    return lab;
+  };
+
+  if (kind === "sba") {
+    // Subject names across the top tick (or untick) that subject in every class shown.
+    var subjectLabels = [];
+    rows.forEach(function (r) {
+      r.items.forEach(function (it) {
+        if (subjectLabels.indexOf(it.label) === -1) subjectLabels.push(it.label);
+      });
+    });
+    if (subjectLabels.length) {
+      var bar = document.createElement("div");
+      bar.style.cssText = "margin-bottom:var(--space-3);";
+      var barLabel = document.createElement("span");
+      barLabel.className = "text-muted";
+      barLabel.style.cssText = "font-size:var(--font-size-xs);margin-right:var(--space-2);";
+      barLabel.textContent = "Tick a subject in every class:";
+      bar.appendChild(barLabel);
+      subjectLabels.forEach(function (lbl) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn btn--outline btn--sm";
+        b.style.cssText = "margin:0 var(--space-1) var(--space-1) 0;";
+        b.textContent = lbl;
+        b.addEventListener("click", function () {
+          var items = [];
+          rows.forEach(function (r) {
+            r.items.forEach(function (it) {
+              if (it.label === lbl) items.push(it);
+            });
+          });
+          var free = items.filter(function (it) {
+            var c = _assignGridCell(kind, it, held);
+            return !(c.otherName && !c.mine);
+          });
+          var allOn = free.length > 0 && free.every(function (it) {
+            return _assignGridCell(kind, it, held).ticked;
+          });
+          free.forEach(function (it) {
+            _assignGridSet(kind, it, !allOn, held);
+          });
+          _assignGridRender(kind);
+        });
+        bar.appendChild(b);
+      });
+      box.appendChild(bar);
+    }
+    rows.forEach(function (r) {
+      var line = document.createElement("div");
+      line.style.cssText =
+        "display:flex;flex-wrap:wrap;align-items:baseline;padding:var(--space-2) 0;border-top:1px solid var(--border);";
+      var name = document.createElement("div");
+      name.style.cssText = "flex:0 0 110px;font-weight:600;font-size:var(--font-size-sm);";
+      name.textContent = r.classLevel;
+      line.appendChild(name);
+      var cells = document.createElement("div");
+      cells.style.cssText = "flex:1 1 300px;";
+      if (!r.items.length) {
+        var none = document.createElement("span");
+        none.className = "text-muted";
+        none.style.fontSize = "var(--font-size-xs)";
+        none.textContent = "No subjects set up for this class.";
+        cells.appendChild(none);
+      } else {
+        var free = r.items.filter(function (it) {
+          var c = _assignGridCell(kind, it, held);
+          return !(c.otherName && !c.mine);
+        });
+        var allItem = { key: "ALL|" + r.classLevel };
+        var allLab = document.createElement("label");
+        allLab.style.cssText =
+          "display:inline-flex;align-items:center;gap:6px;margin:0 var(--space-4) var(--space-2) 0;" +
+          "font-size:var(--font-size-sm);font-style:italic;cursor:pointer;";
+        var allCb = document.createElement("input");
+        allCb.type = "checkbox";
+        allCb.setAttribute("data-grid-key", allItem.key);
+        allCb.disabled = free.length === 0;
+        allCb.checked = free.length > 0 && free.every(function (it) {
+          return _assignGridCell(kind, it, held).ticked;
+        });
+        allCb.addEventListener("change", function () {
+          free.forEach(function (it) {
+            _assignGridSet(kind, it, allCb.checked, held);
+          });
+          _assignGridRender(kind);
+        });
+        allLab.appendChild(allCb);
+        allLab.appendChild(document.createTextNode("All"));
+        cells.appendChild(allLab);
+        r.items.forEach(function (it) {
+          cells.appendChild(makeBox(it, it.label));
+        });
+      }
+      line.appendChild(cells);
+      box.appendChild(line);
+    });
+  } else {
+    var wrap = document.createElement("div");
+    rows.forEach(function (r) {
+      wrap.appendChild(makeBox(r.items[0], r.classLevel));
+    });
+    box.appendChild(wrap);
+  }
+
+  var changes = Object.keys(state.desired).map(function (k) {
+    return state.desired[k];
+  });
+  var addCount = changes.filter(function (c) {
+    return c.on;
+  }).length;
+  var footer = document.createElement("div");
+  footer.style.cssText =
+    "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);margin-top:var(--space-3);";
+  var summary = document.createElement("span");
+  summary.style.fontSize = "var(--font-size-sm)";
+  summary.textContent = changes.length
+    ? addCount + " to add, " + (changes.length - addCount) + " to remove"
+    : "No changes yet";
+  var save = document.createElement("button");
+  save.type = "button";
+  save.className = "btn btn--primary";
+  save.textContent = "💾 Save changes";
+  save.disabled = changes.length === 0;
+  save.addEventListener("click", function () {
+    _assignGridConfirmSave(kind);
+  });
+  var undo = document.createElement("button");
+  undo.type = "button";
+  undo.className = "btn btn--ghost";
+  undo.textContent = "Undo changes";
+  undo.disabled = changes.length === 0;
+  undo.addEventListener("click", function () {
+    state.desired = {};
+    _assignGridRender(kind);
+  });
+  footer.appendChild(save);
+  footer.appendChild(undo);
+  footer.appendChild(summary);
+  box.appendChild(footer);
+
+  if (focusKey) {
+    var again = box.querySelector('[data-grid-key="' + focusKey.replace(/["\\]/g, "\\$&") + '"]');
+    if (again) again.focus();
+  }
+}
+
+function _assignGridChangeLabel(kind, item) {
+  return kind === "sba" ? item.classLevel + " – " + item.label : item.classLevel;
+}
+
+function _assignGridConfirmSave(kind) {
+  var state = ASSIGN_GRID_STATE_[kind];
+  var held = _assignGridHeld(kind);
+  var adds = [];
+  var removes = [];
+  Object.keys(state.desired).forEach(function (k) {
+    var c = state.desired[k];
+    if (c.on) {
+      adds.push(c.item);
+    } else {
+      var cell = _assignGridCell(kind, c.item, held);
+      if (cell.mine) removes.push({ id: cell.mine.assignment_id, item: c.item });
+    }
+  });
+  if (!adds.length && !removes.length) {
+    showToast("Nothing to change.", "info");
+    return;
+  }
+  var list = function (heading, items) {
+    if (!items.length) return "";
+    return (
+      "<p><strong>" +
+      heading +
+      " (" +
+      items.length +
+      ")</strong></p><ul style=\"margin:0 0 var(--space-3) var(--space-5);max-height:160px;overflow:auto;\">" +
+      items
+        .map(function (it) {
+          return "<li>" + sanitizeDisplayValue(_assignGridChangeLabel(kind, it)) + "</li>";
+        })
+        .join("") +
+      "</ul>"
+    );
+  };
+  var teacher = _assignGridTeacher(state.staffId);
+  showModal(
+    "Save assignments?",
+    "<p>For <strong>" +
+      sanitizeDisplayValue(_assignGridTeacherName(teacher) || state.staffId) +
+      "</strong>:</p>" +
+      list("Add", adds) +
+      list(
+        "Remove",
+        removes.map(function (r) {
+          return r.item;
+        }),
+      ) +
+      (removes.length && kind === "sba"
+        ? '<p class="text-muted" style="font-size:var(--font-size-sm);">Removing a subject keeps the SBA marks already entered.</p>'
+        : ""),
+    [
+      { label: "Cancel", cls: "btn--ghost", action: closeModal },
+      {
+        label: "Save",
+        cls: "btn--primary",
+        action: function () {
+          closeModal(function () {
+            _assignGridSave(kind, adds, removes);
+          });
+        },
+      },
+    ],
+  );
+}
+
+/* Sends removals first, then additions, in small batches so no single request runs long. */
+function _assignGridSave(kind, adds, removes) {
+  var state = ASSIGN_GRID_STATE_[kind];
+  var staffId = state.staffId;
+  var ops = removes
+    .map(function (r) {
+      return { removeId: r.id };
+    })
+    .concat(
+      adds.map(function (a) {
+        return { add: { classLevel: a.classLevel, subjectId: a.subjectId, subjectName: a.label } };
+      }),
+    );
+  var batches = [];
+  for (var i = 0; i < ops.length; i += ASSIGN_GRID_BATCH_) batches.push(ops.slice(i, i + ASSIGN_GRID_BATCH_));
+  var total = { added: [], removed: [], failed: [], autoSubjectsKept: 0 };
+  var finish = function (stoppedMessage) {
+    hideSpinner();
+    state.desired = {};
+    if (kind === "sba") loadSbaAssignments();
+    else loadAssignments();
+    var done = total.added.length + " added, " + total.removed.length + " removed";
+    var extra =
+      total.autoSubjectsKept > 0
+        ? "<p>" +
+          total.autoSubjectsKept +
+          " SBA subject(s) that came with the removed class were kept. Change them in SBA Records → Assign Subjects &amp; Classes.</p>"
+        : "";
+    if (!total.failed.length && !stoppedMessage) {
+      if (extra) showModal("Assignments saved", "<p>" + done + ".</p>" + extra, [{ label: "OK", cls: "btn--primary", action: closeModal }]);
+      else showToast("Assignments saved: " + done + ".", "success");
+      return;
+    }
+    showModal(
+      "Some changes were not saved",
+      "<p>" +
+        done +
+        ".</p>" +
+        (stoppedMessage ? "<p>" + sanitizeDisplayValue(stoppedMessage) + "</p>" : "") +
+        (total.failed.length
+          ? "<ul style=\"margin:0 0 var(--space-3) var(--space-5);max-height:200px;overflow:auto;\">" +
+            total.failed
+              .map(function (f) {
+                return (
+                  "<li>" +
+                  (f.label ? "<strong>" + sanitizeDisplayValue(f.label) + ":</strong> " : "") +
+                  sanitizeDisplayValue(f.message || "") +
+                  "</li>"
+                );
+              })
+              .join("") +
+            "</ul>"
+          : "") +
+        extra,
+      [{ label: "OK", cls: "btn--primary", action: closeModal }],
+    );
+  };
+  var next = function (n) {
+    if (n >= batches.length) {
+      finish("");
+      return;
+    }
+    var batch = batches[n];
+    _assignGridCall(
+      staffId,
+      kind,
+      batch
+        .filter(function (o) {
+          return o.add;
+        })
+        .map(function (o) {
+          return o.add;
+        }),
+      batch
+        .filter(function (o) {
+          return o.removeId;
+        })
+        .map(function (o) {
+          return o.removeId;
+        }),
+    ).then(
+      function (r) {
+        if (_checkAuthCode(r)) {
+          hideSpinner();
+          return;
+        }
+        if (!r || !r.success) {
+          finish((r && r.message) || "The server could not save these changes.");
+          return;
+        }
+        total.added = total.added.concat(r.added || []);
+        total.removed = total.removed.concat(r.removed || []);
+        total.failed = total.failed.concat(r.failed || []);
+        total.autoSubjectsKept += r.autoSubjectsKept || 0;
+        next(n + 1);
+      },
+      function (e) {
+        finish(friendlyErrorFrontend(e ? e.message : ""));
+      },
+    );
+  };
+  showSpinner();
+  next(0);
 }
 
 function doRevokeSbaAssignment(assignmentId, staffId, classLevel) {
@@ -5250,6 +5777,7 @@ function buildSbaRecordsSection(container) {
       '<option value="B">B</option><option value="C">C</option><option value="D">D</option>' +
       "</select>" +
       "</div>" +
+      '<details style="margin-top:var(--space-3);"><summary style="cursor:pointer;font-size:var(--font-size-sm);">Assign one at a time</summary>' +
       '<div class="form-group">' +
       '<label class="form-label">Class Level</label>' +
       '<select class="form-control" id="sbaAssignClassLevel" style="max-width:220px;" data-onchange="rebuildSbaAssignSubject()"></select>' +
@@ -5259,14 +5787,22 @@ function buildSbaRecordsSection(container) {
       '<select class="form-control" id="sbaAssignSubject" style="max-width:220px;"><option value="">Loading…</option></select>' +
       "</div>" +
       '<button class="btn btn--primary" style="max-width:220px;width:100%;" data-onclick="doSbaAssign()">✅ Assign</button>' +
+      "</details>" +
       "</div>" +
       "</div>" +
       '<div class="assignment-panel__table-col">' +
       '<div id="sbaAssignTable"><div class="loading-state"><div class="spinner spinner--sm"></div></div></div>' +
       "</div>" +
       "</div>" +
+      '<div id="sbaAssignGrid" style="padding:var(--space-4);border-top:1px solid var(--border);"></div>' +
       "</div>",
   );
+  var _sbaStaffBox = document.getElementById("sbaAssignStaff");
+  if (_sbaStaffBox) {
+    _sbaStaffBox.addEventListener("change", function () {
+      _assignGridRender("sba");
+    });
+  }
 
   // Fixed Academic Year / Term labels — reuses the existing
   // getSyncStatus()-backed loaders, no new endpoint.
@@ -5294,7 +5830,10 @@ function buildSbaRecordsSection(container) {
   if (TEACHERS_CACHE.length === 0) {
     callServer("getTeachersForAdmin", {}, ADMIN_TOKEN).then(
       function (r) {
-        if (r && r.success) TEACHERS_CACHE = r.teachers || [];
+        if (r && r.success) {
+          TEACHERS_CACHE = r.teachers || [];
+          _assignGridRender("sba");
+        }
       },
       function () {
         /* silent */
