@@ -4183,7 +4183,7 @@ function loadSbaAssignments() {
       // keep the duplicate-check cache in sync with the live assignment table every time it
       // reloads (after page load, after a successful Assign, and after a Revoke).
       ADMIN_SBA_ASSIGNMENTS_CACHE = r.assignments || [];
-      _renderSbaAssignmentTable(r.assignments || []);
+      _assignGridRenderCurrent(r.assignments || []);
       _assignGridRender("sba");
     },
     function () {
@@ -4457,8 +4457,8 @@ function doSbaAssign() {
 }
 
 // SECTION: TICK-BOX ASSIGNMENT GRID
-// Pick a teacher once, then tick Attendance classes ("att") or class + subject pairs ("sba") and
-// save them together. Changes go through the same server checks as the one-at-a-time form.
+// Pick a teacher, tap Attendance classes ("att") or class + subject pairs ("sba"), then save them
+// together. Changes go through the same server checks as the one-at-a-time form.
 
 var ADMIN_DUTY_ASSIGNMENTS_CACHE = [];
 var ASSIGN_GRID_BATCH_ = 10;
@@ -4491,6 +4491,25 @@ function _assignGridTeacher(staffId) {
 
 function _assignGridTeacherName(t) {
   return t ? [t.first_name, t.middle_name, t.surname].filter(Boolean).join(" ") : "";
+}
+
+// "AGYEMANG BADU" -> "Agyemang B." so a taken subject's owner fits under its name.
+function _assignGridShortName(staffId) {
+  var t = _assignGridTeacher(staffId);
+  if (!t) return "Staff " + staffId;
+  var first = String(t.first_name || "").trim();
+  var last = String(t.surname || "").trim();
+  var cap = function (s) {
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  };
+  return (cap(first) + (last ? " " + last.charAt(0).toUpperCase() + "." : "")).trim() || "Staff " + staffId;
+}
+
+function _assignGridEl(tag, css, text) {
+  var node = document.createElement(tag);
+  if (css) node.style.cssText = css;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 
 /* Rows in the Class Level dropdown's order: [{classLevel, items: [{key, classLevel, subjectId, label}]}]. */
@@ -4527,7 +4546,7 @@ function _assignGridRows(kind) {
   });
 }
 
-/* {key: [active assignment rows]} for every teacher, from the lists the tables already loaded. */
+/* {key: [active assignment rows]} for every teacher, from the lists the screen already loaded. */
 function _assignGridHeld(kind) {
   var held = {};
   var list =
@@ -4543,36 +4562,159 @@ function _assignGridHeld(kind) {
   return held;
 }
 
-/* One item's state for the selected teacher: {mine, ticked, otherName}. */
+/* One item's state for the selected teacher: {mine, ticked, other (staff_id or "")}. */
 function _assignGridCell(kind, item, held) {
   var state = ASSIGN_GRID_STATE_[kind];
   var rows = held[item.key] || [];
+  var me = _assignGridNormId(state.staffId);
   var mine = rows.find(function (a) {
-    return _assignGridNormId(a.staff_id) === _assignGridNormId(state.staffId);
+    return _assignGridNormId(a.staff_id) === me;
   });
   var other = rows.find(function (a) {
-    return _assignGridNormId(a.staff_id) !== _assignGridNormId(state.staffId);
+    return _assignGridNormId(a.staff_id) !== me;
   });
   var want = state.desired[item.key];
-  return {
-    mine: mine || null,
-    ticked: want ? want.on : !!mine,
-    otherName: other ? _assignGridTeacherName(_assignGridTeacher(other.staff_id)) || "Staff ID " + other.staff_id : "",
-  };
+  return { mine: mine || null, ticked: want ? want.on : !!mine, other: other ? String(other.staff_id) : "" };
+}
+
+function _assignGridFree(kind, item, held) {
+  var c = _assignGridCell(kind, item, held);
+  return !(c.other && !c.mine);
 }
 
 function _assignGridSet(kind, item, on, held) {
   var state = ASSIGN_GRID_STATE_[kind];
   var cell = _assignGridCell(kind, item, held);
-  if (cell.otherName && !cell.mine) return;
+  if (cell.other && !cell.mine) return;
   if (on === !!cell.mine) delete state.desired[item.key];
   else state.desired[item.key] = { on: on, item: item };
+}
+
+/* Fills the SBA tab's teacher picker from TEACHERS_CACHE, keeping the current choice. */
+function _assignGridFillTeachers() {
+  var sel = document.getElementById("sbaGridTeacher");
+  if (!sel || sel.options.length === TEACHERS_CACHE.length + 1) return;
+  var keep = sel.value;
+  sel.textContent = "";
+  sel.appendChild(new Option(TEACHERS_CACHE.length ? "— Choose a teacher —" : "Loading teachers…", ""));
+  TEACHERS_CACHE.slice()
+    .sort(function (a, b) {
+      return _assignGridTeacherName(a).localeCompare(_assignGridTeacherName(b));
+    })
+    .forEach(function (t) {
+      var status = String(t.account_status || "");
+      var label = _assignGridTeacherName(t) + " (" + t.staff_id + ")";
+      if (status === "Locked" || status === "Inactive") label += " – " + status;
+      sel.appendChild(new Option(label, String(t.staff_id)));
+    });
+  sel.value = keep;
+}
+
+/* Teacher picked in the SBA tab: asks first when unsaved ticks would be lost. */
+function _assignGridPickTeacher(staffId) {
+  var sel = document.getElementById("sbaGridTeacher");
+  var state = ASSIGN_GRID_STATE_.sba;
+  var apply = function () {
+    var box = document.getElementById("sbaAssignStaff");
+    if (box) box.value = staffId;
+    if (sel) sel.value = staffId;
+    if (typeof _autoSelectSbaSchoolLevelByStaffId === "function") _autoSelectSbaSchoolLevelByStaffId();
+    _assignGridRender("sba");
+  };
+  var pending = Object.keys(state.desired).length;
+  if (!pending || _assignGridNormId(staffId) === _assignGridNormId(state.staffId)) {
+    apply();
+    return;
+  }
+  if (sel) sel.value = state.staffId;
+  showModal(
+    "Discard unsaved changes?",
+    "<p>You have " + pending + " unsaved change(s) for the current teacher.</p>",
+    [
+      { label: "Keep editing", cls: "btn--ghost", action: closeModal },
+      {
+        label: "Discard",
+        cls: "btn--danger",
+        action: function () {
+          closeModal(function () {
+            state.desired = {};
+            apply();
+          });
+        },
+      },
+    ],
+  );
+}
+
+function _assignGridPill(kind, item, label, held, onToggle) {
+  var cell = _assignGridCell(kind, item, held);
+  var taken = cell.other && !cell.mine;
+  var added = cell.ticked && !cell.mine;
+  var removed = !cell.ticked && !!cell.mine;
+  var pill = _assignGridEl(
+    "label",
+    "position:relative;display:inline-flex;flex-direction:column;justify-content:center;min-height:38px;" +
+      "margin:0 var(--space-2) var(--space-2) 0;padding:6px 14px;border-radius:var(--radius-full);" +
+      "border:1px solid var(--border);font-size:var(--font-size-sm);line-height:1.25;cursor:pointer;" +
+      "user-select:none;-webkit-tap-highlight-color:transparent;",
+  );
+  var cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = cell.ticked;
+  cb.disabled = taken;
+  cb.setAttribute("data-grid-key", item.key);
+  cb.style.cssText = "position:absolute;opacity:0;width:1px;height:1px;";
+  var text = _assignGridEl("span", "font-weight:600;");
+  if (taken) {
+    pill.style.background = "var(--bg-light)";
+    pill.style.color = "var(--text-muted)";
+    pill.style.borderStyle = "dashed";
+    pill.style.cursor = "not-allowed";
+    pill.title = "Already taught by " + _assignGridShortName(cell.other) + ". Remove it from them first.";
+    text.style.fontWeight = "400";
+    text.textContent = label;
+    pill.appendChild(cb);
+    pill.appendChild(text);
+    pill.appendChild(_assignGridEl("span", "font-size:var(--font-size-xs);", _assignGridShortName(cell.other)));
+    return pill;
+  }
+  if (cell.ticked) {
+    pill.style.background = "var(--primary)";
+    pill.style.borderColor = "var(--primary)";
+    pill.style.color = "var(--text-white)";
+    text.textContent = (added ? "+ " : "✓ ") + label;
+    if (added) pill.style.boxShadow = "0 0 0 3px var(--accent-light)";
+  } else if (removed) {
+    pill.style.borderColor = "var(--border-error)";
+    pill.style.color = "var(--border-error)";
+    text.style.textDecoration = "line-through";
+    text.textContent = label;
+    pill.title = "Will be removed when you save";
+  } else {
+    pill.style.background = "var(--bg-card)";
+    pill.style.color = "var(--text-primary)";
+    text.style.fontWeight = "500";
+    text.textContent = label;
+  }
+  cb.addEventListener("change", function () {
+    onToggle(cb.checked);
+  });
+  cb.addEventListener("focus", function () {
+    pill.style.outline = "2px solid var(--border-focus)";
+  });
+  cb.addEventListener("blur", function () {
+    pill.style.outline = "";
+  });
+  pill.appendChild(cb);
+  pill.appendChild(text);
+  return pill;
 }
 
 /* Redraws the grid for whichever teacher is in the panel's Staff ID box. */
 function _assignGridRender(kind) {
   var box = document.getElementById(kind + "AssignGrid");
   if (!box) return;
+  if (kind === "sba") _assignGridFillTeachers();
   var state = ASSIGN_GRID_STATE_[kind];
   var input = document.getElementById(kind === "sba" ? "sbaAssignStaff" : "attAssignStaff");
   var staffId = input ? input.value.trim() : "";
@@ -4580,210 +4722,369 @@ function _assignGridRender(kind) {
     state.staffId = staffId;
     state.desired = {};
   }
-  var focusKey = document.activeElement && document.activeElement.getAttribute
-    ? document.activeElement.getAttribute("data-grid-key")
-    : null;
+  var focusKey =
+    document.activeElement && document.activeElement.getAttribute
+      ? document.activeElement.getAttribute("data-grid-key")
+      : null;
   box.textContent = "";
-  var what = kind === "sba" ? "classes and subjects" : "Attendance classes";
   var teacher = _assignGridTeacher(staffId);
-  var note = function (text) {
-    var p = document.createElement("p");
-    p.className = "text-muted";
-    p.style.cssText = "font-size:var(--font-size-sm);margin:0;";
-    p.textContent = text;
-    box.appendChild(p);
+  var empty = function (text) {
+    box.appendChild(
+      _assignGridEl(
+        "div",
+        "padding:var(--space-5);text-align:center;border:1px dashed var(--border);border-radius:var(--radius-lg);" +
+          "color:var(--text-secondary);font-size:var(--font-size-sm);background:var(--bg-light);",
+        text,
+      ),
+    );
   };
   if (!teacher) {
-    note("✔ Quick assign: search for a teacher above to tick all their " + what + " at once.");
+    empty(
+      kind === "sba"
+        ? "Choose a teacher above. Their classes and subjects will appear here to tap."
+        : "✔ Quick assign: search for a teacher above to tap all their Attendance classes at once.",
+    );
     return;
   }
   var status = String(teacher.account_status || "");
-  var blocked = status === "Locked" || status === "Inactive";
-  var held = _assignGridHeld(kind);
-  var rows = _assignGridRows(kind);
-
-  var title = document.createElement("div");
-  title.style.cssText = "font-weight:600;margin-bottom:var(--space-2);";
-  title.textContent =
-    "Tick the " + what + " for " + _assignGridTeacherName(teacher) + " (" + teacher.staff_id + ")";
-  box.appendChild(title);
-  if (blocked) {
-    note("This account is " + status + ". " + (status === "Locked" ? "Unlock" : "Reactivate") + " it in All Teachers first.");
+  if (status === "Locked" || status === "Inactive") {
+    empty(
+      _assignGridTeacherName(teacher) +
+        "'s account is " +
+        status +
+        ". " +
+        (status === "Locked" ? "Unlock" : "Reactivate") +
+        " it in All Teachers before assigning.",
+    );
     return;
   }
-
-  var makeBox = function (item, label) {
-    var cell = _assignGridCell(kind, item, held);
-    var lab = document.createElement("label");
-    lab.style.cssText =
-      "display:inline-flex;align-items:center;gap:6px;margin:0 var(--space-4) var(--space-2) 0;" +
-      "font-size:var(--font-size-sm);cursor:pointer;";
-    var cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = cell.ticked;
-    cb.setAttribute("data-grid-key", item.key);
-    var text = label;
-    if (cell.otherName && !cell.mine) {
-      cb.disabled = true;
-      lab.style.cursor = "not-allowed";
-      lab.style.color = "var(--text-muted)";
-      lab.title = "Already assigned to " + cell.otherName + ". Revoke it in the list first.";
-      text += " (" + cell.otherName + ")";
-    } else if (cell.ticked !== !!cell.mine) {
-      lab.style.fontWeight = "600";
-      lab.style.color = cell.ticked ? "var(--primary)" : "var(--border-error)";
-    }
-    cb.addEventListener("change", function () {
-      _assignGridSet(kind, item, cb.checked, held);
-      _assignGridRender(kind);
-    });
-    lab.appendChild(cb);
-    lab.appendChild(document.createTextNode(text));
-    return lab;
+  var held = _assignGridHeld(kind);
+  var rows = _assignGridRows(kind);
+  var rerender = function () {
+    _assignGridRender(kind);
   };
 
+  // Legend, so the three pill looks explain themselves.
+  var legend = _assignGridEl(
+    "div",
+    "display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center;margin-bottom:var(--space-3);" +
+      "font-size:var(--font-size-xs);color:var(--text-secondary);",
+  );
+  [
+    ["✓ Teaches", "background:var(--primary);color:var(--text-white);border:1px solid var(--primary);"],
+    ["Free", "background:var(--bg-card);border:1px solid var(--border);"],
+    ["Taken", "background:var(--bg-light);border:1px dashed var(--border);color:var(--text-muted);"],
+  ].forEach(function (l) {
+    legend.appendChild(
+      _assignGridEl("span", "padding:2px 10px;border-radius:var(--radius-full);" + l[1], l[0]),
+    );
+  });
+  if (kind === "att") {
+    var attTitle = _assignGridEl(
+      "div",
+      "font-weight:600;margin-bottom:var(--space-2);",
+      "Tap the Attendance classes for " + _assignGridTeacherName(teacher),
+    );
+    box.appendChild(attTitle);
+  }
+  box.appendChild(legend);
+
   if (kind === "sba") {
-    // Subject names across the top tick (or untick) that subject in every class shown.
-    var subjectLabels = [];
+    // One quick control: tick (or untick) a subject in every class shown.
+    var labels = [];
     rows.forEach(function (r) {
       r.items.forEach(function (it) {
-        if (subjectLabels.indexOf(it.label) === -1) subjectLabels.push(it.label);
+        if (labels.indexOf(it.label) === -1) labels.push(it.label);
       });
     });
-    if (subjectLabels.length) {
-      var bar = document.createElement("div");
-      bar.style.cssText = "margin-bottom:var(--space-3);";
-      var barLabel = document.createElement("span");
-      barLabel.className = "text-muted";
-      barLabel.style.cssText = "font-size:var(--font-size-xs);margin-right:var(--space-2);";
-      barLabel.textContent = "Tick a subject in every class:";
-      bar.appendChild(barLabel);
-      subjectLabels.forEach(function (lbl) {
-        var b = document.createElement("button");
-        b.type = "button";
-        b.className = "btn btn--outline btn--sm";
-        b.style.cssText = "margin:0 var(--space-1) var(--space-1) 0;";
-        b.textContent = lbl;
-        b.addEventListener("click", function () {
-          var items = [];
-          rows.forEach(function (r) {
-            r.items.forEach(function (it) {
-              if (it.label === lbl) items.push(it);
-            });
+    if (labels.length && rows.length > 1) {
+      var quick = _assignGridEl(
+        "div",
+        "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);",
+      );
+      quick.appendChild(
+        _assignGridEl("span", "font-size:var(--font-size-sm);color:var(--text-secondary);", "Same subject in every class:"),
+      );
+      var pick = document.createElement("select");
+      pick.className = "form-control";
+      pick.style.cssText = "flex:1 1 180px;max-width:260px;";
+      pick.appendChild(new Option("— Pick a subject —", ""));
+      labels.forEach(function (l) {
+        pick.appendChild(new Option(l, l));
+      });
+      pick.addEventListener("change", function () {
+        var lbl = pick.value;
+        if (!lbl) return;
+        var items = [];
+        rows.forEach(function (r) {
+          r.items.forEach(function (it) {
+            if (it.label === lbl && _assignGridFree(kind, it, held)) items.push(it);
           });
-          var free = items.filter(function (it) {
-            var c = _assignGridCell(kind, it, held);
-            return !(c.otherName && !c.mine);
-          });
-          var allOn = free.length > 0 && free.every(function (it) {
+        });
+        var allOn =
+          items.length > 0 &&
+          items.every(function (it) {
             return _assignGridCell(kind, it, held).ticked;
           });
+        items.forEach(function (it) {
+          _assignGridSet(kind, it, !allOn, held);
+        });
+        rerender();
+      });
+      quick.appendChild(pick);
+      box.appendChild(quick);
+    }
+    var withSubjects = rows.filter(function (r) {
+      return r.items.length > 0;
+    });
+    if (!withSubjects.length) {
+      empty("No subjects are set up for these classes yet. Add them in the desktop app, then sync.");
+    }
+    withSubjects.forEach(function (r) {
+      var card = _assignGridEl(
+        "div",
+        "border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-3) var(--space-1);" +
+          "margin-bottom:var(--space-3);background:var(--bg-card);",
+      );
+      var head = _assignGridEl(
+        "div",
+        "display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2);",
+      );
+      var free = r.items.filter(function (it) {
+        return _assignGridFree(kind, it, held);
+      });
+      var on = r.items.filter(function (it) {
+        return _assignGridCell(kind, it, held).ticked;
+      }).length;
+      var name = _assignGridEl("div", "font-weight:700;");
+      name.textContent = r.classLevel + " ";
+      name.appendChild(
+        _assignGridEl(
+          "span",
+          "font-weight:400;font-size:var(--font-size-xs);color:var(--text-secondary);",
+          on ? "· " + on + " selected" : "",
+        ),
+      );
+      head.appendChild(name);
+      if (free.length) {
+        var allOn = free.every(function (it) {
+          return _assignGridCell(kind, it, held).ticked;
+        });
+        var all = _assignGridEl("button", "", allOn ? "Clear all" : "Select all");
+        all.type = "button";
+        all.className = "btn btn--ghost btn--sm";
+        all.setAttribute("data-grid-key", "ALL|" + r.classLevel);
+        all.addEventListener("click", function () {
           free.forEach(function (it) {
             _assignGridSet(kind, it, !allOn, held);
           });
-          _assignGridRender(kind);
+          rerender();
         });
-        bar.appendChild(b);
-      });
-      box.appendChild(bar);
-    }
-    rows.forEach(function (r) {
-      var line = document.createElement("div");
-      line.style.cssText =
-        "display:flex;flex-wrap:wrap;align-items:baseline;padding:var(--space-2) 0;border-top:1px solid var(--border);";
-      var name = document.createElement("div");
-      name.style.cssText = "flex:0 0 110px;font-weight:600;font-size:var(--font-size-sm);";
-      name.textContent = r.classLevel;
-      line.appendChild(name);
-      var cells = document.createElement("div");
-      cells.style.cssText = "flex:1 1 300px;";
-      if (!r.items.length) {
-        var none = document.createElement("span");
-        none.className = "text-muted";
-        none.style.fontSize = "var(--font-size-xs)";
-        none.textContent = "No subjects set up for this class.";
-        cells.appendChild(none);
-      } else {
-        var free = r.items.filter(function (it) {
-          var c = _assignGridCell(kind, it, held);
-          return !(c.otherName && !c.mine);
-        });
-        var allItem = { key: "ALL|" + r.classLevel };
-        var allLab = document.createElement("label");
-        allLab.style.cssText =
-          "display:inline-flex;align-items:center;gap:6px;margin:0 var(--space-4) var(--space-2) 0;" +
-          "font-size:var(--font-size-sm);font-style:italic;cursor:pointer;";
-        var allCb = document.createElement("input");
-        allCb.type = "checkbox";
-        allCb.setAttribute("data-grid-key", allItem.key);
-        allCb.disabled = free.length === 0;
-        allCb.checked = free.length > 0 && free.every(function (it) {
-          return _assignGridCell(kind, it, held).ticked;
-        });
-        allCb.addEventListener("change", function () {
-          free.forEach(function (it) {
-            _assignGridSet(kind, it, allCb.checked, held);
-          });
-          _assignGridRender(kind);
-        });
-        allLab.appendChild(allCb);
-        allLab.appendChild(document.createTextNode("All"));
-        cells.appendChild(allLab);
-        r.items.forEach(function (it) {
-          cells.appendChild(makeBox(it, it.label));
-        });
+        head.appendChild(all);
       }
-      line.appendChild(cells);
-      box.appendChild(line);
+      card.appendChild(head);
+      r.items.forEach(function (it) {
+        card.appendChild(
+          _assignGridPill(kind, it, it.label, held, function (checked) {
+            _assignGridSet(kind, it, checked, held);
+            rerender();
+          }),
+        );
+      });
+      box.appendChild(card);
     });
   } else {
-    var wrap = document.createElement("div");
+    var wrap = _assignGridEl("div", "");
     rows.forEach(function (r) {
-      wrap.appendChild(makeBox(r.items[0], r.classLevel));
+      var it = r.items[0];
+      wrap.appendChild(
+        _assignGridPill(kind, it, r.classLevel, held, function (checked) {
+          _assignGridSet(kind, it, checked, held);
+          rerender();
+        }),
+      );
     });
     box.appendChild(wrap);
   }
 
+  // With unsaved changes the save bar is pinned to the bottom of the screen, so it is never scrolled away.
   var changes = Object.keys(state.desired).map(function (k) {
     return state.desired[k];
   });
   var addCount = changes.filter(function (c) {
     return c.on;
   }).length;
-  var footer = document.createElement("div");
-  footer.style.cssText =
-    "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);margin-top:var(--space-3);";
-  var summary = document.createElement("span");
-  summary.style.fontSize = "var(--font-size-sm)";
-  summary.textContent = changes.length
-    ? addCount + " to add, " + (changes.length - addCount) + " to remove"
-    : "No changes yet";
-  var save = document.createElement("button");
+  var bar = _assignGridEl(
+    "div",
+    "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);" +
+      "margin-top:var(--space-3);padding:var(--space-3);border-radius:var(--radius-lg);" +
+      "background:var(--bg-card);border:1px solid var(--border);",
+  );
+  if (changes.length) {
+    bar.style.cssText +=
+      "position:fixed;left:12px;right:12px;bottom:12px;z-index:50;max-width:760px;margin:0 auto;" +
+      "box-shadow:0 6px 24px rgba(0,0,0,0.18);border-color:var(--primary);";
+    box.style.paddingBottom = "96px";
+  } else {
+    box.style.paddingBottom = "";
+  }
+  var save = _assignGridEl("button", "", "💾 Save changes");
   save.type = "button";
   save.className = "btn btn--primary";
-  save.textContent = "💾 Save changes";
   save.disabled = changes.length === 0;
   save.addEventListener("click", function () {
     _assignGridConfirmSave(kind);
   });
-  var undo = document.createElement("button");
+  var undo = _assignGridEl("button", "", "Undo");
   undo.type = "button";
   undo.className = "btn btn--ghost";
-  undo.textContent = "Undo changes";
   undo.disabled = changes.length === 0;
   undo.addEventListener("click", function () {
     state.desired = {};
-    _assignGridRender(kind);
+    rerender();
   });
-  footer.appendChild(save);
-  footer.appendChild(undo);
-  footer.appendChild(summary);
-  box.appendChild(footer);
+  bar.appendChild(save);
+  bar.appendChild(undo);
+  bar.appendChild(
+    _assignGridEl(
+      "span",
+      "font-size:var(--font-size-sm);color:var(--text-secondary);",
+      changes.length
+        ? addCount + " to add · " + (changes.length - addCount) + " to remove"
+        : "No changes yet",
+    ),
+  );
+  box.appendChild(bar);
 
   if (focusKey) {
     var again = box.querySelector('[data-grid-key="' + focusKey.replace(/["\\]/g, "\\$&") + '"]');
     if (again) again.focus();
   }
+}
+
+/* The SBA tab's "Current assignments" list: one card per teacher, classes with their subjects. */
+function _assignGridRenderCurrent(assignments) {
+  var el = document.getElementById("sbaAssignTable");
+  if (!el) return;
+  el.textContent = "";
+  var groups = {};
+  (assignments || []).forEach(function (a) {
+    var id = _assignGridNormId(a.staff_id);
+    (groups[id] = groups[id] || { staffId: String(a.staff_id), rows: [] }).rows.push(a);
+  });
+  var list = Object.keys(groups).map(function (k) {
+    var g = groups[k];
+    g.name = _assignGridTeacherName(_assignGridTeacher(g.staffId)) || "Staff ID " + g.staffId;
+    return g;
+  });
+  list.sort(function (a, b) {
+    return a.name.localeCompare(b.name);
+  });
+  if (!list.length) {
+    el.appendChild(
+      _assignGridEl(
+        "p",
+        "font-size:var(--font-size-sm);color:var(--text-muted);margin:0;",
+        "No SBA subjects assigned yet. Choose a teacher above to start.",
+      ),
+    );
+    return;
+  }
+  var filter = document.createElement("input");
+  filter.type = "search";
+  filter.className = "form-control";
+  filter.placeholder = "Search by teacher, class or subject";
+  filter.style.cssText = "margin-bottom:var(--space-3);";
+  el.appendChild(filter);
+  var cards = [];
+  list.forEach(function (g) {
+    var card = _assignGridEl(
+      "div",
+      "border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--space-3);margin-bottom:var(--space-3);" +
+        "background:var(--bg-card);",
+    );
+    var head = _assignGridEl(
+      "div",
+      "display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-2);",
+    );
+    var who = _assignGridEl("div", "min-width:0;");
+    who.appendChild(_assignGridEl("div", "font-weight:700;overflow-wrap:anywhere;", g.name));
+    who.appendChild(
+      _assignGridEl(
+        "div",
+        "font-size:var(--font-size-xs);color:var(--text-secondary);",
+        "Staff ID " + g.staffId + " · " + g.rows.length + " subject" + (g.rows.length === 1 ? "" : "s"),
+      ),
+    );
+    head.appendChild(who);
+    var edit = _assignGridEl("button", "flex:0 0 auto;", "✏️ Edit");
+    edit.type = "button";
+    edit.className = "btn btn--outline btn--sm";
+    edit.addEventListener("click", function () {
+      _assignGridPickTeacher(g.staffId);
+      var top = document.getElementById("sbaGridTeacher");
+      if (top && top.scrollIntoView) top.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    head.appendChild(edit);
+    card.appendChild(head);
+
+    var byClass = {};
+    var classOrder = [];
+    g.rows.forEach(function (a) {
+      var c = String(a.class_level || "");
+      if (!byClass[c]) {
+        byClass[c] = [];
+        classOrder.push(c);
+      }
+      byClass[c].push(a);
+    });
+    classOrder.sort(function (a, b) {
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+    var searchText = (g.name + " " + g.staffId).toLowerCase();
+    classOrder.forEach(function (c) {
+      var line = _assignGridEl(
+        "div",
+        "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);padding:var(--space-1) 0;" +
+          "border-top:1px solid var(--border);",
+      );
+      line.appendChild(_assignGridEl("div", "flex:0 0 84px;font-size:var(--font-size-sm);font-weight:600;", c));
+      byClass[c].forEach(function (a) {
+        var subject = a.subject_name || "Subject #" + (a.subject_id || "—");
+        searchText += " " + c.toLowerCase() + " " + String(subject).toLowerCase();
+        var chip = _assignGridEl(
+          "span",
+          "display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:var(--radius-full);" +
+            "background:var(--bg-light);border:1px solid var(--border);font-size:var(--font-size-xs);",
+        );
+        chip.appendChild(_assignGridEl("span", "", subject));
+        var x = _assignGridEl(
+          "button",
+          "border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:14px;line-height:1;" +
+            "padding:2px 6px;border-radius:var(--radius-full);",
+          "×",
+        );
+        x.type = "button";
+        x.title = "Remove " + subject + " (" + c + ") from " + g.name;
+        x.setAttribute("aria-label", x.title);
+        x.addEventListener("click", function () {
+          doRevokeSbaAssignment(a.assignment_id, a.staff_id, a.class_level);
+        });
+        chip.appendChild(x);
+        line.appendChild(chip);
+      });
+      card.appendChild(line);
+    });
+    card.setAttribute("data-search", searchText);
+    cards.push(card);
+    el.appendChild(card);
+  });
+  filter.addEventListener("input", function () {
+    var q = filter.value.trim().toLowerCase();
+    cards.forEach(function (card) {
+      card.style.display = !q || card.getAttribute("data-search").indexOf(q) !== -1 ? "" : "none";
+    });
+  });
 }
 
 function _assignGridChangeLabel(kind, item) {
@@ -5866,19 +6167,21 @@ function buildSbaRecordsSection(container) {
       '<div id="sbaAssignTab" class="tab-content" style="padding-top:var(--space-5);">' +
       '<div class="section-header" style="margin-top:0;"><div>' +
       '<div class="section-header__title">SBA Assignments</div>' +
-      '<div class="section-header__subtitle">Assign a teacher to enter SBA marks for a class + subject. ' +
-      "Multiple teachers can be assigned to the same class for different subjects.</div>" +
+      '<div class="section-header__subtitle">Choose which teacher enters SBA marks for each class and subject.</div>' +
       "</div></div>" +
-      '<div class="assignment-panel" style="max-width:100%;">' +
-      '<div class="assignment-panel__header assignment-panel__header--center">📊 SBA Assignments</div>' +
-      '<div class="assignment-panel__body assignment-panel__body--reflow">' +
-      '<div class="assignment-panel__form-col">' +
-      '<div class="assignment-panel__add-form">' +
-      '<div class="assignment-panel__add-title">Assign Teacher</div>' +
-      _buildTeacherNameSearchHTML("sba") +
-      '<div class="form-group">' +
-      '<label class="form-label">Staff ID</label>' +
-      '<input type="text" class="form-control" id="sbaAssignStaff" placeholder="Staff ID" style="max-width:220px;text-align:center;">' +
+      '<div style="max-width:880px;">' +
+      '<div class="card" style="margin-bottom:var(--space-5);">' +
+      '<div class="card__header"><span class="card__title">✏️ Assign classes &amp; subjects</span></div>' +
+      '<div class="card__body">' +
+      '<div style="display:grid;gap:var(--space-2);margin-bottom:var(--space-4);font-size:var(--font-size-sm);color:var(--text-secondary);">' +
+      '<div style="display:flex;align-items:flex-start;gap:var(--space-2);"><span style="flex:0 0 22px;height:22px;border-radius:50%;background:var(--primary);color:var(--text-white);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">1</span><span><strong>Choose the teacher.</strong></span></div>' +
+      '<div style="display:flex;align-items:flex-start;gap:var(--space-2);"><span style="flex:0 0 22px;height:22px;border-radius:50%;background:var(--primary);color:var(--text-white);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">2</span><span><strong>Tap the subjects</strong> they teach in each class. Tap again to remove.</span></div>' +
+      '<div style="display:flex;align-items:flex-start;gap:var(--space-2);"><span style="flex:0 0 22px;height:22px;border-radius:50%;background:var(--primary);color:var(--text-white);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">3</span><span>Tap <strong>Save changes</strong>.</span></div>' +
+      "</div>" +
+      '<div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-end;">' +
+      '<div class="form-group" style="flex:1 1 260px;margin:0;">' +
+      '<label class="form-label" for="sbaGridTeacher">Teacher</label>' +
+      '<select class="form-control" id="sbaGridTeacher"><option value="">Loading teachers…</option></select>' +
       "</div>" +
       '<div class="form-group">' +
       '<label class="form-label">School Level</label>' +
@@ -5887,39 +6190,37 @@ function buildSbaRecordsSection(container) {
       '<label><input type="radio" name="sbaAssignLevel" value="JHS" data-onchange="rebuildSbaAssignClassLevel()"> JHS</label>' +
       "</div>" +
       "</div>" +
-      '<div class="form-group">' +
+      '<div class="form-group" style="flex:0 1 160px;margin:0;">' +
       '<label class="form-label">Class Type</label>' +
       '<select class="form-control" id="sbaAssignClassType" style="max-width:220px;" data-onchange="rebuildSbaAssignClassLevel()">' +
       '<option value="Normal">Normal</option><option value="A">A</option>' +
       '<option value="B">B</option><option value="C">C</option><option value="D">D</option>' +
       "</select>" +
       "</div>" +
-      '<details style="margin-top:var(--space-3);"><summary style="cursor:pointer;font-size:var(--font-size-sm);">Assign one at a time</summary>' +
-      '<div class="form-group">' +
-      '<label class="form-label">Class Level</label>' +
-      '<select class="form-control" id="sbaAssignClassLevel" style="max-width:220px;" data-onchange="rebuildSbaAssignSubject()"></select>' +
       "</div>" +
-      '<div class="form-group">' +
-      '<label class="form-label">Subject</label>' +
-      '<select class="form-control" id="sbaAssignSubject" style="max-width:220px;"><option value="">Loading…</option></select>' +
-      "</div>" +
-      '<button class="btn btn--primary" style="max-width:220px;width:100%;" data-onclick="doSbaAssign()">✅ Assign</button>' +
-      "</details>" +
+      '<input type="hidden" id="sbaAssignStaff">' +
+      '<div id="sbaAssignGrid" style="margin-top:var(--space-4);"></div>' +
       "</div>" +
       "</div>" +
-      '<div class="assignment-panel__table-col">' +
+      '<div class="card">' +
+      '<div class="card__header"><span class="card__title">📋 Current assignments</span></div>' +
+      '<div class="card__body">' +
       '<div id="sbaAssignTable"><div class="loading-state"><div class="spinner spinner--sm"></div></div></div>' +
       "</div>" +
       "</div>" +
-      '<div id="sbaAssignGrid" style="padding:var(--space-4);border-top:1px solid var(--border);"></div>' +
+      '<div hidden>' +
+      '<select class="form-control" id="sbaAssignClassLevel" style="max-width:220px;" data-onchange="rebuildSbaAssignSubject()"></select>' +
+      '<select class="form-control" id="sbaAssignSubject" style="max-width:220px;"><option value="">Loading…</option></select>' +
+      "</div>" +
       "</div>",
   );
-  var _sbaStaffBox = document.getElementById("sbaAssignStaff");
-  if (_sbaStaffBox) {
-    _sbaStaffBox.addEventListener("change", function () {
-      _assignGridRender("sba");
+  var _sbaTeacherPick = document.getElementById("sbaGridTeacher");
+  if (_sbaTeacherPick) {
+    _sbaTeacherPick.addEventListener("change", function () {
+      _assignGridPickTeacher(_sbaTeacherPick.value);
     });
   }
+  _assignGridRender("sba");
 
   // Fixed Academic Year / Term labels — reuses the existing
   // getSyncStatus()-backed loaders, no new endpoint.
