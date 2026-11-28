@@ -4692,27 +4692,21 @@ function _assignGridRender(kind) {
     box.appendChild(wrap);
   }
 
-  // With unsaved changes the save bar is pinned to the bottom of the screen, so it is never scrolled away.
   var changes = Object.keys(state.desired).map(function (k) {
     return state.desired[k];
   });
   var addCount = changes.filter(function (c) {
     return c.on;
   }).length;
+  // Marks the end of the tick boxes; the save bar is pinned only while this is below the screen.
+  var endOfBoxes = _assignGridEl("div", "height:1px;");
+  box.appendChild(endOfBoxes);
   var bar = _assignGridEl(
     "div",
     "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);" +
       "margin-top:var(--space-3);padding:var(--space-3);border-radius:var(--radius-lg);" +
       "background:var(--bg-card);border:1px solid var(--border);",
   );
-  if (changes.length) {
-    bar.style.cssText +=
-      "position:fixed;left:12px;right:12px;bottom:12px;z-index:50;max-width:760px;margin:0 auto;" +
-      "box-shadow:0 6px 24px rgba(0,0,0,0.18);border-color:var(--primary);";
-    box.style.paddingBottom = "96px";
-  } else {
-    box.style.paddingBottom = "";
-  }
   var save = _assignGridEl("button", "", "💾 Save changes");
   save.type = "button";
   save.className = "btn btn--primary";
@@ -4740,11 +4734,43 @@ function _assignGridRender(kind) {
     ),
   );
   box.appendChild(bar);
+  _assignGridPinBar(kind, bar, endOfBoxes, changes.length > 0);
 
   if (focusKey) {
     var again = box.querySelector('[data-grid-key="' + focusKey.replace(/["\\]/g, "\\$&") + '"]');
     if (again) again.focus();
   }
+}
+
+/* Pins the save bar to the bottom of the screen only while unsaved changes exist and tick boxes are
+   still below the screen; once the admin scrolls past them it sits in place and covers nothing. */
+function _assignGridPinBar(kind, bar, endOfBoxes, hasChanges) {
+  var state = ASSIGN_GRID_STATE_[kind];
+  if (state.unpin) state.unpin();
+  state.unpin = null;
+  if (!hasChanges) return;
+  var base = bar.style.cssText;
+  var pinned =
+    "position:fixed;left:12px;right:12px;bottom:12px;z-index:50;max-width:760px;margin:0 auto;" +
+    "box-shadow:0 6px 24px rgba(0,0,0,0.18);border-color:var(--primary);";
+  var place = function () {
+    if (!document.body.contains(endOfBoxes)) {
+      if (state.unpin) state.unpin();
+      return;
+    }
+    var rect = endOfBoxes.getBoundingClientRect();
+    var shown = rect.width > 0 || rect.height > 0;
+    var stillBelow = shown && rect.top > window.innerHeight - 24;
+    bar.style.cssText = stillBelow ? base + pinned : base;
+  };
+  window.addEventListener("scroll", place, true);
+  window.addEventListener("resize", place);
+  state.unpin = function () {
+    window.removeEventListener("scroll", place, true);
+    window.removeEventListener("resize", place);
+    state.unpin = null;
+  };
+  place();
 }
 
 /* The SBA tab's "Current assignments" list: one card per teacher, classes with their subjects. */
@@ -4947,19 +4973,28 @@ function _assignGridSave(kind, adds, removes) {
   var staffId = state.staffId;
   var ops = removes
     .map(function (r) {
-      return { removeId: r.id };
+      return { key: r.item.key, removeId: r.id };
     })
     .concat(
       adds.map(function (a) {
-        return { add: { classLevel: a.classLevel, subjectId: a.subjectId, subjectName: a.label } };
+        return { key: a.key, add: { classLevel: a.classLevel, subjectId: a.subjectId, subjectName: a.label } };
       }),
     );
   var batches = [];
   for (var i = 0; i < ops.length; i += ASSIGN_GRID_BATCH_) batches.push(ops.slice(i, i + ASSIGN_GRID_BATCH_));
   var total = { added: [], removed: [], failed: [], autoSubjectsKept: 0 };
-  var finish = function (stoppedMessage) {
+  // A save cut short (no internet, server error) keeps the ticks it never sent, so Save can be tapped again.
+  var finish = function (stoppedMessage, unsentFrom) {
     hideSpinner();
-    state.desired = {};
+    var keep = {};
+    if (stoppedMessage) {
+      batches.slice(unsentFrom).forEach(function (b) {
+        b.forEach(function (o) {
+          if (state.desired[o.key]) keep[o.key] = state.desired[o.key];
+        });
+      });
+    }
+    state.desired = keep;
     if (kind === "sba") loadSbaAssignments();
     else loadAssignments();
     var done = total.added.length + " added, " + total.removed.length + " removed";
@@ -4979,7 +5014,11 @@ function _assignGridSave(kind, adds, removes) {
       "<p>" +
         done +
         ".</p>" +
-        (stoppedMessage ? "<p>" + sanitizeDisplayValue(stoppedMessage) + "</p>" : "") +
+        (stoppedMessage
+          ? "<p>" +
+            sanitizeDisplayValue(stoppedMessage) +
+            "</p><p>The changes not yet saved are still ticked. Tap <strong>Save changes</strong> to try again.</p>"
+          : "") +
         (total.failed.length
           ? "<ul style=\"margin:0 0 var(--space-3) var(--space-5);max-height:200px;overflow:auto;\">" +
             total.failed
@@ -5028,7 +5067,7 @@ function _assignGridSave(kind, adds, removes) {
           return;
         }
         if (!r || !r.success) {
-          finish((r && r.message) || "The server could not save these changes.");
+          finish((r && r.message) || "The server could not save these changes.", n);
           return;
         }
         total.added = total.added.concat(r.added || []);
@@ -5038,7 +5077,7 @@ function _assignGridSave(kind, adds, removes) {
         next(n + 1);
       },
       function (e) {
-        finish(friendlyErrorFrontend(e ? e.message : ""));
+        finish(friendlyErrorFrontend(e ? e.message : ""), n);
       },
     );
   };
