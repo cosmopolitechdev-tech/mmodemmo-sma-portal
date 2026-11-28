@@ -3486,12 +3486,7 @@ function buildClassAssignmentsSection(container) {
   );
   // SBA Assignments panel (and its "Load Subjects_Reference then rebuild dropdowns" /
   // loadSbaAssignments() init calls) moved to buildSbaRecordsSection() below — see that function.
-  var _attStaffBox = document.getElementById("attAssignStaff");
-  if (_attStaffBox) {
-    _attStaffBox.addEventListener("change", function () {
-      _assignGridRender("att");
-    });
-  }
+  _assignGridWireAttendance();
 
   loadAssignments();
 
@@ -3701,6 +3696,7 @@ function _assignmentTypeLabel(type) {
 }
 
 function _buildAssignmentPanel(type, prefix) {
+  if (prefix === "att") return _assignGridAttendancePanel("");
   var label = _assignmentTypeLabel(type);
   return (
     '<div class="assignment-panel">' +
@@ -3729,9 +3725,6 @@ function _buildAssignmentPanel(type, prefix) {
     '<option value="B">B</option><option value="C">C</option><option value="D">D</option>' +
     "</select>" +
     "</div>" +
-    (prefix === "att"
-      ? '<details style="margin-top:var(--space-3);"><summary style="cursor:pointer;font-size:var(--font-size-sm);">Assign one at a time</summary>'
-      : "") +
     '<div class="form-group">' +
     '<label class="form-label">Class Level</label>' +
     '<select class="form-control" id="' +
@@ -3743,7 +3736,6 @@ function _buildAssignmentPanel(type, prefix) {
     "', '" +
     prefix +
     "')\">✅ Assign</button>" +
-    (prefix === "att" ? "</details>" : "") +
     "</div>" +
     "</div>" +
     '<div class="assignment-panel__table-col">' +
@@ -3752,9 +3744,6 @@ function _buildAssignmentPanel(type, prefix) {
     'AssignTable"><div class="loading-state"><div class="spinner spinner--sm"></div></div></div>' +
     "</div>" +
     "</div>" +
-    (prefix === "att"
-      ? '<div id="attAssignGrid" style="padding:var(--space-4);border-top:1px solid var(--border);"></div>'
-      : "") +
     "</div>"
   );
 }
@@ -3799,7 +3788,7 @@ function loadAssignments() {
       }
       ADMIN_DUTY_ASSIGNMENTS_CACHE = r.assignments || [];
       _assignGridRender("att");
-      _renderAssignmentTable(r.assignments || [], "Attendance", "att");
+      _assignGridRenderCurrent("att", r.assignments || []);
       _renderAssignmentTable(r.assignments || [], "Daily_Levy", "levy");
       _renderAssignmentTable(r.assignments || [], "Admission_Fee", "admfee");
       _renderAssignmentTable(r.assignments || [], "Tuition_Fee", "tuifee");
@@ -3968,7 +3957,7 @@ function loadSbaAssignments() {
       // keep the duplicate-check cache in sync with the live assignment table every time it
       // reloads (after page load, after a successful Assign, and after a Revoke).
       ADMIN_SBA_ASSIGNMENTS_CACHE = r.assignments || [];
-      _assignGridRenderCurrent(r.assignments || []);
+      _assignGridRenderCurrent("sba", r.assignments || []);
       _assignGridRender("sba");
     },
     function () {
@@ -4375,9 +4364,9 @@ function _assignGridSet(kind, item, on, held) {
   else state.desired[item.key] = { on: on, item: item };
 }
 
-/* Fills the SBA tab's teacher picker from TEACHERS_CACHE, keeping the current choice. */
-function _assignGridFillTeachers() {
-  var sel = document.getElementById("sbaGridTeacher");
+/* Fills a grid's teacher picker ("sbaGridTeacher" / "attGridTeacher") from TEACHERS_CACHE, keeping the choice. */
+function _assignGridFillTeachers(kind) {
+  var sel = document.getElementById(kind + "GridTeacher");
   if (!sel || sel.options.length === TEACHERS_CACHE.length + 1) return;
   var keep = sel.value;
   sel.textContent = "";
@@ -4395,16 +4384,20 @@ function _assignGridFillTeachers() {
   sel.value = keep;
 }
 
-/* Teacher picked in the SBA tab: asks first when unsaved ticks would be lost. */
-function _assignGridPickTeacher(staffId) {
-  var sel = document.getElementById("sbaGridTeacher");
-  var state = ASSIGN_GRID_STATE_.sba;
+/* Teacher picked in a grid's dropdown: asks first when unsaved ticks would be lost. */
+function _assignGridPickTeacher(kind, staffId) {
+  var sel = document.getElementById(kind + "GridTeacher");
+  var state = ASSIGN_GRID_STATE_[kind];
   var apply = function () {
-    var box = document.getElementById("sbaAssignStaff");
+    var box = document.getElementById(kind + "AssignStaff");
     if (box) box.value = staffId;
     if (sel) sel.value = staffId;
-    if (typeof _autoSelectSbaSchoolLevelByStaffId === "function") _autoSelectSbaSchoolLevelByStaffId();
-    _assignGridRender("sba");
+    if (kind === "sba" && typeof _autoSelectSbaSchoolLevelByStaffId === "function") {
+      _autoSelectSbaSchoolLevelByStaffId();
+    } else if (kind === "att" && typeof _autoSelectSchoolLevelByStaffId === "function") {
+      _autoSelectSchoolLevelByStaffId("att");
+    }
+    _assignGridRender(kind);
   };
   var pending = Object.keys(state.desired).length;
   if (!pending || _assignGridNormId(staffId) === _assignGridNormId(state.staffId)) {
@@ -4499,9 +4492,9 @@ function _assignGridPill(kind, item, label, held, onToggle) {
 function _assignGridRender(kind) {
   var box = document.getElementById(kind + "AssignGrid");
   if (!box) return;
-  if (kind === "sba") _assignGridFillTeachers();
+  _assignGridFillTeachers(kind);
   var state = ASSIGN_GRID_STATE_[kind];
-  var input = document.getElementById(kind === "sba" ? "sbaAssignStaff" : "attAssignStaff");
+  var input = document.getElementById(kind + "AssignStaff");
   var staffId = input ? input.value.trim() : "";
   if (_assignGridNormId(staffId) !== _assignGridNormId(state.staffId)) {
     state.staffId = staffId;
@@ -4527,7 +4520,7 @@ function _assignGridRender(kind) {
     empty(
       kind === "sba"
         ? "Choose a teacher above. Their classes and subjects will appear here to tap."
-        : "✔ Quick assign: search for a teacher above to tap all their Attendance classes at once.",
+        : "Choose a teacher above. The classes will appear here to tap.",
     );
     return;
   }
@@ -4556,7 +4549,7 @@ function _assignGridRender(kind) {
       "font-size:var(--font-size-xs);color:var(--text-secondary);",
   );
   [
-    ["✓ Teaches", "background:var(--primary);color:var(--text-white);border:1px solid var(--primary);"],
+    [kind === "sba" ? "✓ Teaches" : "✓ Takes Attendance", "background:var(--primary);color:var(--text-white);border:1px solid var(--primary);"],
     ["Free", "background:var(--bg-card);border:1px solid var(--border);"],
     ["Taken", "background:var(--bg-light);border:1px dashed var(--border);color:var(--text-muted);"],
   ].forEach(function (l) {
@@ -4564,14 +4557,6 @@ function _assignGridRender(kind) {
       _assignGridEl("span", "padding:2px 10px;border-radius:var(--radius-full);" + l[1], l[0]),
     );
   });
-  if (kind === "att") {
-    var attTitle = _assignGridEl(
-      "div",
-      "font-weight:600;margin-bottom:var(--space-2);",
-      "Tap the Attendance classes for " + _assignGridTeacherName(teacher),
-    );
-    box.appendChild(attTitle);
-  }
   box.appendChild(legend);
 
   if (kind === "sba") {
@@ -4773,13 +4758,16 @@ function _assignGridPinBar(kind, bar, endOfBoxes, hasChanges) {
   place();
 }
 
-/* The SBA tab's "Current assignments" list: one card per teacher, classes with their subjects. */
-function _assignGridRenderCurrent(assignments) {
-  var el = document.getElementById("sbaAssignTable");
+/* A grid's "Current …" list ("sbaAssignTable" / "attAssignTable"): one card per teacher with Edit,
+   and their classes (Attendance) or classes with subjects (SBA), each removable with ×. */
+function _assignGridRenderCurrent(kind, assignments) {
+  var el = document.getElementById(kind + "AssignTable");
   if (!el) return;
   el.textContent = "";
+  var isSba = kind === "sba";
   var groups = {};
   (assignments || []).forEach(function (a) {
+    if (!isSba && a.assignment_type !== "Attendance") return;
     var id = _assignGridNormId(a.staff_id);
     (groups[id] = groups[id] || { staffId: String(a.staff_id), rows: [] }).rows.push(a);
   });
@@ -4796,7 +4784,9 @@ function _assignGridRenderCurrent(assignments) {
       _assignGridEl(
         "p",
         "font-size:var(--font-size-sm);color:var(--text-muted);margin:0;",
-        "No SBA subjects assigned yet. Choose a teacher above to start.",
+        isSba
+          ? "No SBA subjects assigned yet. Choose a teacher above to start."
+          : "No Attendance teachers assigned yet. Choose a teacher above to start.",
       ),
     );
     return;
@@ -4804,9 +4794,39 @@ function _assignGridRenderCurrent(assignments) {
   var filter = document.createElement("input");
   filter.type = "search";
   filter.className = "form-control";
-  filter.placeholder = "Search by teacher, class or subject";
+  filter.placeholder = isSba ? "Search by teacher, class or subject" : "Search by teacher or class";
   filter.style.cssText = "margin-bottom:var(--space-3);";
   el.appendChild(filter);
+  var byClassOrder = function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true });
+  };
+  var chip = function (text, title, onRemove) {
+    var c = _assignGridEl(
+      "span",
+      "display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:var(--radius-full);" +
+        "background:var(--bg-light);border:1px solid var(--border);font-size:var(--font-size-xs);",
+    );
+    c.appendChild(_assignGridEl("span", "", text));
+    var x = _assignGridEl(
+      "button",
+      "border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:14px;line-height:1;" +
+        "padding:2px 6px;border-radius:var(--radius-full);",
+      "×",
+    );
+    x.type = "button";
+    x.title = title;
+    x.setAttribute("aria-label", title);
+    x.addEventListener("click", onRemove);
+    c.appendChild(x);
+    return c;
+  };
+  var line = function () {
+    return _assignGridEl(
+      "div",
+      "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);padding:var(--space-1) 0;" +
+        "border-top:1px solid var(--border);",
+    );
+  };
   var cards = [];
   list.forEach(function (g) {
     var card = _assignGridEl(
@@ -4820,11 +4840,12 @@ function _assignGridRenderCurrent(assignments) {
     );
     var who = _assignGridEl("div", "min-width:0;");
     who.appendChild(_assignGridEl("div", "font-weight:700;overflow-wrap:anywhere;", g.name));
+    var n = g.rows.length;
     who.appendChild(
       _assignGridEl(
         "div",
         "font-size:var(--font-size-xs);color:var(--text-secondary);",
-        "Staff ID " + g.staffId + " · " + g.rows.length + " subject" + (g.rows.length === 1 ? "" : "s"),
+        "Staff ID " + g.staffId + " · " + n + (isSba ? " subject" : " class") + (n === 1 ? "" : isSba ? "s" : "es"),
       ),
     );
     head.appendChild(who);
@@ -4832,60 +4853,58 @@ function _assignGridRenderCurrent(assignments) {
     edit.type = "button";
     edit.className = "btn btn--outline btn--sm";
     edit.addEventListener("click", function () {
-      _assignGridPickTeacher(g.staffId);
-      var top = document.getElementById("sbaGridTeacher");
+      _assignGridPickTeacher(kind, g.staffId);
+      var top = document.getElementById(kind + "GridTeacher");
       if (top && top.scrollIntoView) top.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     head.appendChild(edit);
     card.appendChild(head);
 
-    var byClass = {};
-    var classOrder = [];
-    g.rows.forEach(function (a) {
-      var c = String(a.class_level || "");
-      if (!byClass[c]) {
-        byClass[c] = [];
-        classOrder.push(c);
-      }
-      byClass[c].push(a);
-    });
-    classOrder.sort(function (a, b) {
-      return a.localeCompare(b, undefined, { numeric: true });
-    });
     var searchText = (g.name + " " + g.staffId).toLowerCase();
-    classOrder.forEach(function (c) {
-      var line = _assignGridEl(
-        "div",
-        "display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);padding:var(--space-1) 0;" +
-          "border-top:1px solid var(--border);",
-      );
-      line.appendChild(_assignGridEl("div", "flex:0 0 84px;font-size:var(--font-size-sm);font-weight:600;", c));
-      byClass[c].forEach(function (a) {
-        var subject = a.subject_name || "Subject #" + (a.subject_id || "—");
-        searchText += " " + c.toLowerCase() + " " + String(subject).toLowerCase();
-        var chip = _assignGridEl(
-          "span",
-          "display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:var(--radius-full);" +
-            "background:var(--bg-light);border:1px solid var(--border);font-size:var(--font-size-xs);",
-        );
-        chip.appendChild(_assignGridEl("span", "", subject));
-        var x = _assignGridEl(
-          "button",
-          "border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:14px;line-height:1;" +
-            "padding:2px 6px;border-radius:var(--radius-full);",
-          "×",
-        );
-        x.type = "button";
-        x.title = "Remove " + subject + " (" + c + ") from " + g.name;
-        x.setAttribute("aria-label", x.title);
-        x.addEventListener("click", function () {
-          doRevokeSbaAssignment(a.assignment_id, a.staff_id, a.class_level);
+    if (!isSba) {
+      var classes = line();
+      g.rows
+        .slice()
+        .sort(function (a, b) {
+          return byClassOrder(a.class_level, b.class_level);
+        })
+        .forEach(function (a) {
+          var c = String(a.class_level || "");
+          searchText += " " + c.toLowerCase();
+          classes.appendChild(
+            chip(c, "Remove " + c + " Attendance from " + g.name, function () {
+              doRevokeAssignment(a.assignment_id);
+            }),
+          );
         });
-        chip.appendChild(x);
-        line.appendChild(chip);
+      card.appendChild(classes);
+    } else {
+      var byClass = {};
+      var classOrder = [];
+      g.rows.forEach(function (a) {
+        var c = String(a.class_level || "");
+        if (!byClass[c]) {
+          byClass[c] = [];
+          classOrder.push(c);
+        }
+        byClass[c].push(a);
       });
-      card.appendChild(line);
-    });
+      classOrder.sort(byClassOrder);
+      classOrder.forEach(function (c) {
+        var row = line();
+        row.appendChild(_assignGridEl("div", "flex:0 0 84px;font-size:var(--font-size-sm);font-weight:600;", c));
+        byClass[c].forEach(function (a) {
+          var subject = a.subject_name || "Subject #" + (a.subject_id || "—");
+          searchText += " " + c.toLowerCase() + " " + String(subject).toLowerCase();
+          row.appendChild(
+            chip(subject, "Remove " + subject + " (" + c + ") from " + g.name, function () {
+              doRevokeSbaAssignment(a.assignment_id, a.staff_id, a.class_level);
+            }),
+          );
+        });
+        card.appendChild(row);
+      });
+    }
     card.setAttribute("data-search", searchText);
     cards.push(card);
     el.appendChild(card);
@@ -4896,6 +4915,70 @@ function _assignGridRenderCurrent(assignments) {
       card.style.display = !q || card.getAttribute("data-search").indexOf(q) !== -1 ? "" : "none";
     });
   });
+}
+
+/* The Attendance panel of Duty Assignments, laid out like the SBA tab. levelHtml is the edition's
+   school-level control (hidden input, radio row, or nothing). */
+function _assignGridAttendancePanel(levelHtml) {
+  var step = function (n, html) {
+    return (
+      '<div style="display:flex;align-items:flex-start;gap:var(--space-2);"><span style="flex:0 0 22px;height:22px;' +
+      "border-radius:50%;background:var(--primary);color:var(--text-white);display:inline-flex;align-items:center;" +
+      'justify-content:center;font-size:12px;font-weight:700;">' +
+      n +
+      "</span><span>" +
+      html +
+      "</span></div>"
+    );
+  };
+  return (
+    '<div class="assignment-panel">' +
+    '<div class="assignment-panel__header assignment-panel__header--center">📋 Attendance Assignments</div>' +
+    '<div style="padding:var(--space-4);max-width:880px;">' +
+    '<div style="display:grid;gap:var(--space-2);margin-bottom:var(--space-4);font-size:var(--font-size-sm);color:var(--text-secondary);">' +
+    step(1, "<strong>Choose the teacher.</strong>") +
+    step(2, "<strong>Tap the classes</strong> they take Attendance for. Each class has one Attendance teacher.") +
+    step(3, "Tap <strong>Save changes</strong>.") +
+    "</div>" +
+    '<div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-end;">' +
+    '<div class="form-group" style="flex:1 1 260px;margin:0;">' +
+    '<label class="form-label" for="attGridTeacher">Teacher</label>' +
+    '<select class="form-control" id="attGridTeacher"><option value="">Loading teachers…</option></select>' +
+    "</div>" +
+    (levelHtml || "") +
+    '<div class="form-group" style="flex:0 1 160px;margin:0;">' +
+    '<label class="form-label" for="attClassType">Class Type</label>' +
+    '<select class="form-control" id="attClassType">' +
+    '<option value="Normal">Normal</option><option value="A">A</option>' +
+    '<option value="B">B</option><option value="C">C</option><option value="D">D</option>' +
+    "</select>" +
+    "</div>" +
+    "</div>" +
+    '<input type="hidden" id="attAssignStaff">' +
+    '<div hidden><select id="attClassLevel"></select></div>' +
+    '<div id="attAssignGrid" style="margin-top:var(--space-4);"></div>' +
+    '<div style="margin-top:var(--space-5);font-weight:700;color:var(--primary);margin-bottom:var(--space-2);">📋 Current Attendance teachers</div>' +
+    '<div id="attAssignTable"><div class="loading-state"><div class="spinner spinner--sm"></div></div></div>' +
+    "</div>" +
+    "</div>"
+  );
+}
+
+/* Wires the Attendance panel's teacher picker and Class Type once the section is on the page. */
+function _assignGridWireAttendance() {
+  var pick = document.getElementById("attGridTeacher");
+  if (pick) {
+    pick.addEventListener("change", function () {
+      _assignGridPickTeacher("att", pick.value);
+    });
+  }
+  var type = document.getElementById("attClassType");
+  if (type) {
+    type.addEventListener("change", function () {
+      rebuildAssignClassLevel("att");
+    });
+  }
+  _assignGridRender("att");
 }
 
 function _assignGridChangeLabel(kind, item) {
@@ -6072,7 +6155,7 @@ function buildSbaRecordsSection(container) {
   var _sbaTeacherPick = document.getElementById("sbaGridTeacher");
   if (_sbaTeacherPick) {
     _sbaTeacherPick.addEventListener("change", function () {
-      _assignGridPickTeacher(_sbaTeacherPick.value);
+      _assignGridPickTeacher("sba", _sbaTeacherPick.value);
     });
   }
   _assignGridRender("sba");
